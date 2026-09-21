@@ -237,7 +237,7 @@ fun AutomotiveHardwareControlBar(
     if (isVerticalLayout) {
         Column(
             modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             volumeCard(Modifier.fillMaxWidth())
             brightnessCard(Modifier.fillMaxWidth())

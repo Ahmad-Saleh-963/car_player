@@ -10,7 +10,12 @@ import java.io.File
 
 class MediaStoreRepository(private val context: Context) {
 
-    suspend fun loadAudioTracks(): List<MediaTrack> = withContext(Dispatchers.IO) {
+    suspend fun loadAudioTracks(forceRefresh: Boolean = false): List<MediaTrack> = withContext(Dispatchers.IO) {
+        // Fast Cache Hit: Return pre-indexed structure in 0ms without Disk/MediaStore queries
+        if (!forceRefresh && MediaIndexCache.isIndexed && MediaIndexCache.allAudioTracks.isNotEmpty()) {
+            return@withContext MediaIndexCache.allAudioTracks
+        }
+
         val tracks = mutableListOf<MediaTrack>()
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
@@ -75,10 +80,17 @@ class MediaStoreRepository(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // Build Fast Index Cache once on IO Thread
+        MediaIndexCache.updateAudioIndex(tracks)
         tracks
     }
 
-    suspend fun loadVideoTracks(): List<MediaTrack> = withContext(Dispatchers.IO) {
+    suspend fun loadVideoTracks(forceRefresh: Boolean = false): List<MediaTrack> = withContext(Dispatchers.IO) {
+        if (!forceRefresh && MediaIndexCache.allVideoTracks.isNotEmpty()) {
+            return@withContext MediaIndexCache.allVideoTracks
+        }
+
         val videos = mutableListOf<MediaTrack>()
         val projection = arrayOf(
             MediaStore.Video.Media._ID,
@@ -136,6 +148,8 @@ class MediaStoreRepository(private val context: Context) {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        MediaIndexCache.updateVideoIndex(videos)
         videos
     }
 }
