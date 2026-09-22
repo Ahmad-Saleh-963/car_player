@@ -51,6 +51,17 @@ import com.example.my_car.ui.components.MediaThumbnailImage
 import com.example.my_car.ui.theme.*
 import java.util.Locale
 
+// 🚀 FLAT LIST ITEMS FOR 0MS INSTANT LAZY COLUMN EXPANSION (NO UI THREAD LAG)
+sealed class FolderListItem {
+    data class FolderHeader(val folderName: String, val trackCount: Int, val isExpanded: Boolean) : FolderListItem()
+    data class TrackRow(val track: MediaTrack) : FolderListItem()
+}
+
+sealed class ArtistListItem {
+    data class ArtistHeader(val artistName: String, val trackCount: Int, val isExpanded: Boolean) : ArtistListItem()
+    data class TrackRow(val track: MediaTrack) : ArtistListItem()
+}
+
 @Composable
 fun AudioPlayerScreen(
     tracks: List<MediaTrack>,
@@ -96,7 +107,7 @@ fun AudioPlayerScreen(
         result
     }
 
-    // High Performance Reactive Lookups (Recomputes instantly on favoriteVersion increment)
+    // High Performance Reactive Lookups
     val folderGroups = remember(filteredTracks, favoriteVersion) {
         filteredTracks.groupBy { it.folderName }
             .map { (folderName, folderTracks) -> AudioFolder(folderName, folderTracks) }
@@ -107,6 +118,35 @@ fun AudioPlayerScreen(
         filteredTracks.groupBy { it.artist }
             .map { (artistName, artistTracks) -> ArtistGroup(artistName, artistTracks) }
             .sortedBy { it.name }
+    }
+
+    // 🚀 ULTRA-FAST FLAT LIST PRE-COMPUTATION (0ms UI Thread Freeze)
+    val flatFolderItems = remember(folderGroups, expandedFolder) {
+        buildList {
+            folderGroups.forEach { folder ->
+                val isExpanded = expandedFolder == folder.name
+                add(FolderListItem.FolderHeader(folder.name, folder.trackCount, isExpanded))
+                if (isExpanded) {
+                    folder.tracks.forEach { track ->
+                        add(FolderListItem.TrackRow(track))
+                    }
+                }
+            }
+        }
+    }
+
+    val flatArtistItems = remember(artistGroups, expandedArtist) {
+        buildList {
+            artistGroups.forEach { artist ->
+                val isExpanded = expandedArtist == artist.name
+                add(ArtistListItem.ArtistHeader(artist.name, artist.trackCount, isExpanded))
+                if (isExpanded) {
+                    artist.tracks.forEach { track ->
+                        add(ArtistListItem.TrackRow(track))
+                    }
+                }
+            }
+        }
     }
 
     val bgGradient = remember(isDark) {
@@ -274,7 +314,7 @@ fun AudioPlayerScreen(
                     }
                 }
 
-                // 🚀 BLAZINGLY FAST LAZY COLUMN WITH INSTANT REACTIVE FAVORITES
+                // 🚀 BLAZINGLY FAST LAZY COLUMN WITH FLAT LIST RENDERING (0ms EXPANSION FREEZE)
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -284,74 +324,80 @@ fun AudioPlayerScreen(
                 ) {
                     when (selectedFilter) {
                         0 -> {
-                            // 0: Folders (Instant Pre-Indexed O(1) Lookup)
-                            folderGroups.forEach { folder ->
-                                val isExpanded = expandedFolder == folder.name
-
-                                // Folder Header Item
-                                item(key = "folder_header_${folder.name}", contentType = "folder_header") {
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                expandedFolder = if (isExpanded) null else folder.name
-                                            },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.surface,
-                                        border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.5f)),
-                                        shadowElevation = if (isExpanded) 2.dp else 0.dp
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(14.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder,
-                                                    contentDescription = null,
-                                                    tint = Color(0xFFFFB300),
-                                                    modifier = Modifier.size(26.dp)
-                                                )
-                                                Column {
-                                                    Text(
-                                                        text = folder.name,
-                                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    Text(
-                                                        text = "${folder.trackCount} مسارات صوتية",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = Color(0xFFFFB300)
-                                                    )
-                                                }
-                                            }
-
-                                            Icon(
-                                                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = "توسيع",
-                                                tint = Color(0xFFFFB300)
-                                            )
-                                        }
+                            // 0: Folders (Flat List 0ms Instant Expansion)
+                            items(
+                                items = flatFolderItems,
+                                key = { item ->
+                                    when (item) {
+                                        is FolderListItem.FolderHeader -> "fh_${item.folderName}_${item.isExpanded}"
+                                        is FolderListItem.TrackRow -> "tr_${item.track.id}_${item.track.isFavorite}"
+                                    }
+                                },
+                                contentType = { item ->
+                                    when (item) {
+                                        is FolderListItem.FolderHeader -> "folder_header"
+                                        is FolderListItem.TrackRow -> "audio_track_row"
                                     }
                                 }
+                            ) { item ->
+                                when (item) {
+                                    is FolderListItem.FolderHeader -> {
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    expandedFolder = if (item.isExpanded) null else item.folderName
+                                                },
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.5f)),
+                                            shadowElevation = if (item.isExpanded) 2.dp else 0.dp
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(14.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = if (item.isExpanded) Icons.Default.FolderOpen else Icons.Default.Folder,
+                                                        contentDescription = null,
+                                                        tint = Color(0xFFFFB300),
+                                                        modifier = Modifier.size(26.dp)
+                                                    )
+                                                    Column {
+                                                        Text(
+                                                            text = item.folderName,
+                                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            text = "${item.trackCount} مسارات صوتية",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = Color(0xFFFFB300)
+                                                        )
+                                                    }
+                                                }
 
-                                // Folder Track Rows (Dynamic Key includes isFavorite for 0ms Instant Icon Reflection!)
-                                if (isExpanded) {
-                                    items(
-                                        items = folder.tracks,
-                                        key = { "track_f_${folder.name}_${it.id}_${it.isFavorite}" },
-                                        contentType = { "audio_track_row" }
-                                    ) { track ->
+                                                Icon(
+                                                    imageVector = if (item.isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = "توسيع",
+                                                    tint = Color(0xFFFFB300)
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    is FolderListItem.TrackRow -> {
                                         AudioTrackRowItem(
-                                            track = track,
-                                            isSelected = currentTrack?.id == track.id,
+                                            track = item.track,
+                                            isSelected = currentTrack?.id == item.track.id,
                                             isDark = isDark,
                                             onTrackSelect = onTrackSelect,
                                             onToggleFavorite = onToggleFavorite,
@@ -363,73 +409,79 @@ fun AudioPlayerScreen(
                         }
 
                         2 -> {
-                            // 2: Artists
-                            artistGroups.forEach { artist ->
-                                val isExpanded = expandedArtist == artist.name
-
-                                // Artist Header Item
-                                item(key = "artist_header_${artist.name}", contentType = "artist_header") {
-                                    Surface(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                expandedArtist = if (isExpanded) null else artist.name
-                                            },
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = MaterialTheme.colorScheme.surface,
-                                        border = BorderStroke(1.dp, AutomotiveCyanAccent.copy(alpha = 0.5f))
-                                    ) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(14.dp),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.MusicNote,
-                                                    contentDescription = null,
-                                                    tint = AutomotiveCyanAccent,
-                                                    modifier = Modifier.size(26.dp)
-                                                )
-                                                Column {
-                                                    Text(
-                                                        text = artist.name,
-                                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                                        color = MaterialTheme.colorScheme.onSurface
-                                                    )
-                                                    Text(
-                                                        text = "${artist.trackCount} أغاني",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = AutomotiveCyanAccent
-                                                    )
-                                                }
-                                            }
-
-                                            Icon(
-                                                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = "توسيع",
-                                                tint = AutomotiveCyanAccent
-                                            )
-                                        }
+                            // 2: Artists (Flat List 0ms Instant Expansion)
+                            items(
+                                items = flatArtistItems,
+                                key = { item ->
+                                    when (item) {
+                                        is ArtistListItem.ArtistHeader -> "ah_${item.artistName}_${item.isExpanded}"
+                                        is ArtistListItem.TrackRow -> "tr_a_${item.track.id}_${item.track.isFavorite}"
+                                    }
+                                },
+                                contentType = { item ->
+                                    when (item) {
+                                        is ArtistListItem.ArtistHeader -> "artist_header"
+                                        is ArtistListItem.TrackRow -> "audio_track_row"
                                     }
                                 }
+                            ) { item ->
+                                when (item) {
+                                    is ArtistListItem.ArtistHeader -> {
+                                        Surface(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    expandedArtist = if (item.isExpanded) null else item.artistName
+                                                },
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.surface,
+                                            border = BorderStroke(1.dp, AutomotiveCyanAccent.copy(alpha = 0.5f))
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(14.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.MusicNote,
+                                                        contentDescription = null,
+                                                        tint = AutomotiveCyanAccent,
+                                                        modifier = Modifier.size(26.dp)
+                                                    )
+                                                    Column {
+                                                        Text(
+                                                            text = item.artistName,
+                                                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                                            color = MaterialTheme.colorScheme.onSurface
+                                                        )
+                                                        Text(
+                                                            text = "${item.trackCount} أغاني",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = AutomotiveCyanAccent
+                                                        )
+                                                    }
+                                                }
 
-                                // Artist Track Rows
-                                if (isExpanded) {
-                                    items(
-                                        items = artist.tracks,
-                                        key = { "track_a_${artist.name}_${it.id}_${it.isFavorite}" },
-                                        contentType = { "audio_track_row" }
-                                    ) { track ->
+                                                Icon(
+                                                    imageVector = if (item.isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = "توسيع",
+                                                    tint = AutomotiveCyanAccent
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    is ArtistListItem.TrackRow -> {
                                         AudioTrackRowItem(
-                                            track = track,
-                                            isSelected = currentTrack?.id == track.id,
+                                            track = item.track,
+                                            isSelected = currentTrack?.id == item.track.id,
                                             isDark = isDark,
                                             onTrackSelect = onTrackSelect,
                                             onToggleFavorite = onToggleFavorite,

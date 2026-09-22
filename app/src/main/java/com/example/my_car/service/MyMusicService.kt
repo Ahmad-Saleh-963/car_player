@@ -22,6 +22,7 @@ import androidx.media.session.MediaButtonReceiver
 import com.example.my_car.MainActivity
 import com.example.my_car.R
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.toColorInt
 
 @Suppress("DEPRECATION")
 class MyMusicService : MediaBrowserServiceCompat() {
@@ -188,7 +189,7 @@ class MyMusicService : MediaBrowserServiceCompat() {
         val bitmap = createBitmap(160, 160)
         val canvas = Canvas(bitmap)
         val paint = Paint().apply {
-            color = Color.parseColor("#0284C7")
+            color = "#0284C7".toColorInt()
             isAntiAlias = true
         }
         canvas.drawCircle(80f, 80f, 75f, paint)
