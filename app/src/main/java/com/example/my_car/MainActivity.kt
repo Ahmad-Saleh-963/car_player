@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -28,9 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.my_car.data.model.MediaTrack
+import com.example.my_car.data.repository.MediaIndexCache
 import com.example.my_car.data.repository.MediaStoreRepository
 import com.example.my_car.service.MyMusicService
 import com.example.my_car.ui.*
@@ -49,6 +52,7 @@ class MainActivity : ComponentActivity() {
 
     private val audioTracksState = mutableStateListOf<MediaTrack>()
     private val videoTracksState = mutableStateListOf<MediaTrack>()
+    private val photoTracksState = mutableStateListOf<MediaTrack>()
     private val currentTrackState = mutableStateOf<MediaTrack?>(null)
     private val isPlayingState = mutableStateOf(false)
     private val isShuffleState = mutableStateOf(false)
@@ -56,6 +60,11 @@ class MainActivity : ComponentActivity() {
     private val currentPositionMsState = mutableLongStateOf(0L)
     private val durationMsState = mutableLongStateOf(0L)
     private val hasPermissionState = mutableStateOf(false)
+
+    // ⚡ REACTIVE TRIGGER STATE: Increments on every favorite toggle for 100% instant UI updates across all cards!
+    private val favoriteVersionState = mutableIntStateOf(0)
+
+    private var hasAttemptedPermissionRequest = false
 
     private val notificationActionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -75,6 +84,9 @@ class MainActivity : ComponentActivity() {
         hasPermissionState.value = granted
         if (granted) {
             loadMediaFiles()
+            Toast.makeText(this, "تم منح الصلاحيات بنجاح! 🚗", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "تم رفض الصلاحية. اضغط مجدداً للانتقال للإعدادات لتمكينها يدوياً.", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -122,7 +134,7 @@ class MainActivity : ComponentActivity() {
         }
         ContextCompat.registerReceiver(this, notificationActionReceiver, intentFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
-        checkPermissions()
+        checkPermissions(autoLaunchSystemSettingsIfDenied = false)
 
         setContent {
             My_carTheme {
@@ -197,7 +209,8 @@ class MainActivity : ComponentActivity() {
                     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                         if (!hasPermissionState.value) {
                             PermissionScreen(
-                                onRequestPermission = { checkPermissions() },
+                                onRequestPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
+                                onOpenSettings = { openAppSettings(this@MainActivity) },
                                 modifier = Modifier.padding(innerPadding)
                             )
                         } else {
@@ -218,6 +231,7 @@ class MainActivity : ComponentActivity() {
                                 CarScreen.Audio -> {
                                     AudioPlayerScreen(
                                         tracks = audioTracksState,
+                                        favoriteVersion = favoriteVersionState.intValue,
                                         currentTrack = currentTrackState.value,
                                         isPlaying = isPlayingState.value,
                                         currentPositionMs = currentPositionMsState.longValue,
@@ -240,7 +254,9 @@ class MainActivity : ComponentActivity() {
                                 CarScreen.Video -> {
                                     VideoPlayerScreen(
                                         videos = videoTracksState,
+                                        photos = photoTracksState,
                                         onBack = { currentScreen.value = CarScreen.Dashboard },
+                                        onToggleFavorite = { track -> toggleFavorite(track) },
                                         modifier = Modifier.padding(innerPadding)
                                     )
                                 }
@@ -257,9 +273,19 @@ class MainActivity : ComponentActivity() {
                                 CarScreen.Favorites -> {
                                     FavoritesScreen(
                                         tracks = audioTracksState.filter { it.isFavorite },
+                                        favoriteVersion = favoriteVersionState.intValue,
                                         onBack = { currentScreen.value = CarScreen.Dashboard },
                                         onTrackSelect = { track -> playTrack(track) },
                                         onToggleFavorite = { track -> toggleFavorite(track) },
+                                        modifier = Modifier.padding(innerPadding)
+                                    )
+                                }
+
+                                CarScreen.Settings -> {
+                                    SettingsScreen(
+                                        hasMediaPermission = hasPermissionState.value,
+                                        onRequestMediaPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
+                                        onBack = { currentScreen.value = CarScreen.Dashboard },
                                         modifier = Modifier.padding(innerPadding)
                                     )
                                 }
@@ -271,27 +297,35 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun toggleFavorite(track: MediaTrack) {
-        val index = audioTracksState.indexOfFirst { it.id == track.id }
-        if (index != -1) {
-            val updated = track.copy(isFavorite = !track.isFavorite)
-            audioTracksState[index] = updated
-            if (currentTrackState.value?.id == track.id) {
-                currentTrackState.value = updated
-            }
+    override fun onResume() {
+        super.onResume()
+        // Silent check on return from System Settings
+        val permissions = getRequiredPermissions()
+        val allGranted = permissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+
+        if (allGranted && !hasPermissionState.value) {
+            hasPermissionState.value = true
+            loadMediaFiles()
         }
     }
 
-    private fun checkPermissions() {
+    private fun getRequiredPermissions(): List<String> {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
             permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
+            permissions.add(Manifest.permission.READ_MEDIA_IMAGES)
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         } else {
             permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
+        return permissions
+    }
 
+    private fun checkPermissions(autoLaunchSystemSettingsIfDenied: Boolean = false) {
+        val permissions = getRequiredPermissions()
         val allGranted = permissions.all {
             ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
@@ -299,8 +333,49 @@ class MainActivity : ComponentActivity() {
         hasPermissionState.value = allGranted
         if (allGranted) {
             loadMediaFiles()
-        } else {
+            return
+        }
+
+        if (autoLaunchSystemSettingsIfDenied) {
+            val shouldShowRationale = permissions.any {
+                ActivityCompat.shouldShowRequestPermissionRationale(this, it)
+            }
+
+            if (hasAttemptedPermissionRequest && !shouldShowRationale) {
+                // Denied or "Don't Ask Again" checked -> Directly open System App Settings
+                openAppSettings(this)
+                return
+            }
+
+            hasAttemptedPermissionRequest = true
             permissionLauncher.launch(permissions.toTypedArray())
+        }
+    }
+
+    private fun toggleFavorite(track: MediaTrack) {
+        if (track.isImage) {
+            val index = photoTracksState.indexOfFirst { it.id == track.id }
+            if (index != -1) {
+                photoTracksState[index] = track.copy(isFavorite = !track.isFavorite)
+                favoriteVersionState.intValue += 1
+            }
+        } else if (track.isVideo) {
+            val index = videoTracksState.indexOfFirst { it.id == track.id }
+            if (index != -1) {
+                videoTracksState[index] = track.copy(isFavorite = !track.isFavorite)
+                favoriteVersionState.intValue += 1
+            }
+        } else {
+            val index = audioTracksState.indexOfFirst { it.id == track.id }
+            if (index != -1) {
+                val updated = track.copy(isFavorite = !track.isFavorite)
+                audioTracksState[index] = updated
+                if (currentTrackState.value?.id == track.id) {
+                    currentTrackState.value = updated
+                }
+                favoriteVersionState.intValue += 1
+                MediaIndexCache.updateAudioIndex(audioTracksState.toList())
+            }
         }
     }
 
@@ -308,12 +383,16 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             val audio = repository.loadAudioTracks()
             val video = repository.loadVideoTracks()
+            val photo = repository.loadPhotoTracks()
 
             audioTracksState.clear()
             audioTracksState.addAll(audio)
 
             videoTracksState.clear()
             videoTracksState.addAll(video)
+
+            photoTracksState.clear()
+            photoTracksState.addAll(photo)
 
             if (currentTrackState.value == null && audio.isNotEmpty()) {
                 currentTrackState.value = audio.first()
@@ -349,7 +428,6 @@ class MainActivity : ComponentActivity() {
             durationMsState.longValue = track.durationMs.coerceAtLeast(1L)
             currentPositionMsState.longValue = 0L
 
-            // Pass metadata to MediaService & Notification
             val extras = Bundle().apply {
                 putString("title", track.title)
                 putString("artist", track.artist)
@@ -422,7 +500,6 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // Sequential Playback (Default)
         val index = if (current != null) audioTracksState.indexOfFirst { it.id == current.id } else -1
         val nextIndex = if (index != -1 && index + 1 < audioTracksState.size) index + 1 else 0
         playTrack(audioTracksState[nextIndex])

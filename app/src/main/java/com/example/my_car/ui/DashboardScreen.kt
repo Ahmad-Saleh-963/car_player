@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ sealed class CarScreen {
     object Video : CarScreen()
     object Folders : CarScreen()
     object Favorites : CarScreen()
+    object Settings : CarScreen()
 }
 
 @Composable
@@ -83,10 +85,12 @@ fun DashboardScreen(
         }
     }
 
-    val bgGradient = if (isDark) {
-        Brush.verticalGradient(colors = listOf(Color(0xFF0B0F19), Color(0xFF151D2A)))
-    } else {
-        Brush.verticalGradient(colors = listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0)))
+    val bgGradient = remember(isDark) {
+        if (isDark) {
+            Brush.verticalGradient(colors = listOf(Color(0xFF0B0F19), Color(0xFF151D2A)))
+        } else {
+            Brush.verticalGradient(colors = listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0)))
+        }
     }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -100,7 +104,7 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Header Bar with Compact Adaptive Clock
+                // Header Bar with Compact Adaptive Clock & Settings Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -111,12 +115,18 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.weight(1f, fill = false)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.DirectionsCar,
-                            contentDescription = null,
-                            tint = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
-                            modifier = Modifier.size(28.dp)
-                        )
+                        IconButton(
+                            onClick = { onNavigate(CarScreen.Settings) },
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "الإعدادات والصلاحيات",
+                                tint = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
                         Column {
                             Text(
                                 text = "مشغل الوسائط للسيارة",
@@ -256,9 +266,9 @@ fun DashboardScreen(
                     }
                 }
 
-                // Primary Clean Dashboard Cards Grid (Audio, Video, Favorites)
+                // Primary Clean Dashboard Cards Grid (Audio, Video, Favorites, Settings)
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 180.dp),
+                    columns = GridCells.Adaptive(minSize = 170.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier
@@ -298,6 +308,18 @@ fun DashboardScreen(
                             accentColor = Color(0xFFFF4081),
                             isDark = isDark,
                             onClick = { onNavigate(CarScreen.Favorites) }
+                        )
+                    }
+
+                    // Card 4: الإعدادات والصلاحيات (Settings & Permissions Card)
+                    item {
+                        PrimaryDashboardCard(
+                            title = "الإعدادات والصلاحيات",
+                            subtitle = "التشغيل التلقائي والترخيص",
+                            icon = Icons.Default.Settings,
+                            accentColor = Color(0xFFFFB300),
+                            isDark = isDark,
+                            onClick = { onNavigate(CarScreen.Settings) }
                         )
                     }
                 }

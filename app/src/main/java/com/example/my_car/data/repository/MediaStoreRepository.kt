@@ -11,7 +11,6 @@ import java.io.File
 class MediaStoreRepository(private val context: Context) {
 
     suspend fun loadAudioTracks(forceRefresh: Boolean = false): List<MediaTrack> = withContext(Dispatchers.IO) {
-        // Fast Cache Hit: Return pre-indexed structure in 0ms without Disk/MediaStore queries
         if (!forceRefresh && MediaIndexCache.isIndexed && MediaIndexCache.allAudioTracks.isNotEmpty()) {
             return@withContext MediaIndexCache.allAudioTracks
         }
@@ -72,7 +71,8 @@ class MediaStoreRepository(private val context: Context) {
                             durationMs = duration,
                             folderName = folderName,
                             filePath = filePath,
-                            isVideo = false
+                            isVideo = false,
+                            isImage = false
                         )
                     )
                 }
@@ -81,7 +81,6 @@ class MediaStoreRepository(private val context: Context) {
             e.printStackTrace()
         }
 
-        // Build Fast Index Cache once on IO Thread
         MediaIndexCache.updateAudioIndex(tracks)
         tracks
     }
@@ -140,7 +139,8 @@ class MediaStoreRepository(private val context: Context) {
                             durationMs = duration,
                             folderName = folderName,
                             filePath = filePath,
-                            isVideo = true
+                            isVideo = true,
+                            isImage = false
                         )
                     )
                 }
@@ -151,5 +151,70 @@ class MediaStoreRepository(private val context: Context) {
 
         MediaIndexCache.updateVideoIndex(videos)
         videos
+    }
+
+    suspend fun loadPhotoTracks(forceRefresh: Boolean = false): List<MediaTrack> = withContext(Dispatchers.IO) {
+        if (!forceRefresh && MediaIndexCache.allPhotoTracks.isNotEmpty()) {
+            return@withContext MediaIndexCache.allPhotoTracks
+        }
+
+        val photos = mutableListOf<MediaTrack>()
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.TITLE,
+            MediaStore.Images.Media.DATA
+        )
+        val sortOrder = "${MediaStore.Images.Media.DATE_ADDED} DESC"
+
+        try {
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                null,
+                null,
+                sortOrder
+            )?.use { cursor ->
+                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                val titleColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.TITLE)
+                val dataColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idColumn)
+                    val title = cursor.getString(titleColumn) ?: "صورة"
+                    val filePath = cursor.getString(dataColumn) ?: ""
+
+                    val contentUri = ContentUris.withAppendedId(
+                        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                        id
+                    )
+
+                    val folderName = if (filePath.isNotEmpty()) {
+                        File(filePath).parentFile?.name ?: "الصور"
+                    } else {
+                        "الصور"
+                    }
+
+                    photos.add(
+                        MediaTrack(
+                            id = id,
+                            uri = contentUri,
+                            title = title,
+                            artist = "صورة محليّة",
+                            album = "الاستوديو",
+                            durationMs = 0L,
+                            folderName = folderName,
+                            filePath = filePath,
+                            isVideo = false,
+                            isImage = true
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        MediaIndexCache.updatePhotoIndex(photos)
+        photos
     }
 }

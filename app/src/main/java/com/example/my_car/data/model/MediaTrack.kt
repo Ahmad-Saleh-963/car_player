@@ -16,6 +16,7 @@ data class MediaTrack(
     val folderName: String,
     val filePath: String,
     val isVideo: Boolean = false,
+    val isImage: Boolean = false,
     val isFavorite: Boolean = false
 ) {
     fun formatDuration(): String {

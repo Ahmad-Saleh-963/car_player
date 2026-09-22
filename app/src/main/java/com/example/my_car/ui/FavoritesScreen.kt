@@ -14,8 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,6 +30,7 @@ import com.example.my_car.ui.theme.*
 @Composable
 fun FavoritesScreen(
     tracks: List<MediaTrack>,
+    favoriteVersion: Int = 0,
     onBack: () -> Unit,
     onTrackSelect: (MediaTrack) -> Unit,
     onToggleFavorite: (MediaTrack) -> Unit,
@@ -38,10 +38,17 @@ fun FavoritesScreen(
 ) {
     val isDark = isSystemInDarkTheme()
 
-    val bgGradient = if (isDark) {
-        Brush.verticalGradient(colors = listOf(Color(0xFF0B0F19), Color(0xFF151D2A)))
-    } else {
-        Brush.verticalGradient(colors = listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0)))
+    // ⚡ Reactive Filtering bound directly to favoriteVersion
+    val favoriteTracks = remember(tracks, favoriteVersion) {
+        tracks.filter { it.isFavorite }
+    }
+
+    val bgGradient = remember(isDark) {
+        if (isDark) {
+            Brush.verticalGradient(colors = listOf(Color(0xFF0B0F19), Color(0xFF151D2A)))
+        } else {
+            Brush.verticalGradient(colors = listOf(Color(0xFFF1F5F9), Color(0xFFE2E8F0)))
+        }
     }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -83,12 +90,12 @@ fun FavoritesScreen(
                 }
 
                 Text(
-                    text = "المسارات الصوتية المفضلة لدي (${tracks.size}):",
+                    text = "المسارات الصوتية المفضلة لدي (${favoriteTracks.size}):",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                if (tracks.isEmpty()) {
+                if (favoriteTracks.isEmpty()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -107,8 +114,8 @@ fun FavoritesScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         itemsIndexed(
-                            items = tracks,
-                            key = { _, track -> track.id }
+                            items = favoriteTracks,
+                            key = { _, track -> "${track.id}_${track.isFavorite}" }
                         ) { index, track ->
                             Surface(
                                 modifier = Modifier

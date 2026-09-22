@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,7 +46,6 @@ import androidx.compose.ui.unit.sp
 import com.example.my_car.data.model.MediaTrack
 import com.example.my_car.data.repository.ArtistGroup
 import com.example.my_car.data.repository.AudioFolder
-import com.example.my_car.data.repository.MediaIndexCache
 import com.example.my_car.ui.components.AutomotiveHardwareControlBar
 import com.example.my_car.ui.components.MediaThumbnailImage
 import com.example.my_car.ui.theme.*
@@ -56,6 +54,7 @@ import java.util.Locale
 @Composable
 fun AudioPlayerScreen(
     tracks: List<MediaTrack>,
+    favoriteVersion: Int = 0,
     currentTrack: MediaTrack?,
     isPlaying: Boolean,
     currentPositionMs: Long,
@@ -82,8 +81,8 @@ fun AudioPlayerScreen(
     var expandedFolder by remember { mutableStateOf<String?>(null) }
     var expandedArtist by remember { mutableStateOf<String?>(null) }
 
-    // High Performance Filtering
-    val filteredTracks = remember(tracks, searchQuery, selectedFilter) {
+    // High Performance Reactive Filtering (Binds directly to favoriteVersion!)
+    val filteredTracks = remember(tracks, favoriteVersion, searchQuery, selectedFilter) {
         var result = if (searchQuery.isBlank()) tracks else {
             tracks.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||
@@ -97,25 +96,17 @@ fun AudioPlayerScreen(
         result
     }
 
-    // High Performance Pre-Indexed Zero-Allocation Lookups (Instant 0ms, 0 RAM overhead)
-    val folderGroups = remember(filteredTracks, searchQuery, selectedFilter) {
-        if (searchQuery.isBlank() && selectedFilter == 0 && MediaIndexCache.isIndexed) {
-            MediaIndexCache.audioFolders
-        } else {
-            filteredTracks.groupBy { it.folderName }
-                .map { (folderName, folderTracks) -> AudioFolder(folderName, folderTracks) }
-                .sortedBy { it.name }
-        }
+    // High Performance Reactive Lookups (Recomputes instantly on favoriteVersion increment)
+    val folderGroups = remember(filteredTracks, favoriteVersion) {
+        filteredTracks.groupBy { it.folderName }
+            .map { (folderName, folderTracks) -> AudioFolder(folderName, folderTracks) }
+            .sortedBy { it.name }
     }
 
-    val artistGroups = remember(filteredTracks, searchQuery, selectedFilter) {
-        if (searchQuery.isBlank() && selectedFilter == 2 && MediaIndexCache.isIndexed) {
-            MediaIndexCache.artistGroups
-        } else {
-            filteredTracks.groupBy { it.artist }
-                .map { (artistName, artistTracks) -> ArtistGroup(artistName, artistTracks) }
-                .sortedBy { it.name }
-        }
+    val artistGroups = remember(filteredTracks, favoriteVersion) {
+        filteredTracks.groupBy { it.artist }
+            .map { (artistName, artistTracks) -> ArtistGroup(artistName, artistTracks) }
+            .sortedBy { it.name }
     }
 
     val bgGradient = remember(isDark) {
@@ -283,7 +274,7 @@ fun AudioPlayerScreen(
                     }
                 }
 
-                // 🚀 BLAZINGLY FAST LAZY COLUMN WITH INSTANT RECYCLING
+                // 🚀 BLAZINGLY FAST LAZY COLUMN WITH INSTANT REACTIVE FAVORITES
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -351,11 +342,11 @@ fun AudioPlayerScreen(
                                     }
                                 }
 
-                                // Folder Track Rows (Instant Render 0ms, 0 disk I/O)
+                                // Folder Track Rows (Dynamic Key includes isFavorite for 0ms Instant Icon Reflection!)
                                 if (isExpanded) {
                                     items(
                                         items = folder.tracks,
-                                        key = { "track_f_${folder.name}_${it.id}" },
+                                        key = { "track_f_${folder.name}_${it.id}_${it.isFavorite}" },
                                         contentType = { "audio_track_row" }
                                     ) { track ->
                                         AudioTrackRowItem(
@@ -433,7 +424,7 @@ fun AudioPlayerScreen(
                                 if (isExpanded) {
                                     items(
                                         items = artist.tracks,
-                                        key = { "track_a_${artist.name}_${it.id}" },
+                                        key = { "track_a_${artist.name}_${it.id}_${it.isFavorite}" },
                                         contentType = { "audio_track_row" }
                                     ) { track ->
                                         AudioTrackRowItem(
@@ -453,7 +444,7 @@ fun AudioPlayerScreen(
                             // 1: جميع الأغاني 🎵  أو  3: المفضلة ⭐
                             items(
                                 items = filteredTracks,
-                                key = { it.id },
+                                key = { "${it.id}_${it.isFavorite}" },
                                 contentType = { "audio_track_row" }
                             ) { track ->
                                 AudioTrackRowItem(

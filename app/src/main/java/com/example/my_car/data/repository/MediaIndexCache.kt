@@ -41,6 +41,12 @@ object MediaIndexCache {
     @Volatile
     var allVideoTracks: List<MediaTrack> = emptyList()
 
+    @Volatile
+    var allPhotoTracks: List<MediaTrack> = emptyList()
+
+    @Volatile
+    var photoFolders: List<AudioFolder> = emptyList()
+
     fun updateAudioIndex(tracks: List<MediaTrack>) {
         val groupedFoldersMap = tracks.groupBy { it.folderName }
         val groupedArtistsMap = tracks.groupBy { it.artist }
@@ -65,6 +71,13 @@ object MediaIndexCache {
         allVideoTracks = videos
     }
 
+    fun updatePhotoIndex(photos: List<MediaTrack>) {
+        allPhotoTracks = photos
+        photoFolders = photos.groupBy { it.folderName }
+            .map { (folderName, folderPhotos) -> AudioFolder(folderName, folderPhotos) }
+            .sortedBy { it.name }
+    }
+
     fun clear() {
         isIndexed = false
         allAudioTracks = emptyList()
@@ -73,5 +86,7 @@ object MediaIndexCache {
         folderMap = emptyMap()
         artistMap = emptyMap()
         allVideoTracks = emptyList()
+        allPhotoTracks = emptyList()
+        photoFolders = emptyList()
     }
 }
