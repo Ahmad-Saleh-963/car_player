@@ -1,9 +1,11 @@
 package com.example.my_car.data.model
 
 import android.net.Uri
+import androidx.compose.runtime.Immutable
 import java.io.File
 import java.util.Locale
 
+@Immutable
 data class MediaTrack(
     val id: Long,
     val uri: Uri,
@@ -24,6 +26,7 @@ data class MediaTrack(
     }
 
     fun formatSize(): String {
+        if (filePath.isEmpty()) return ""
         val file = File(filePath)
         if (!file.exists()) return ""
         val bytes = file.length()
