@@ -3,7 +3,6 @@ package com.example.my_car.service
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -15,13 +14,16 @@ import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
 import com.example.my_car.MainActivity
 import com.example.my_car.R
+import androidx.core.graphics.createBitmap
 
+@Suppress("DEPRECATION")
 class MyMusicService : MediaBrowserServiceCompat() {
 
     private lateinit var session: MediaSessionCompat
@@ -103,7 +105,7 @@ class MyMusicService : MediaBrowserServiceCompat() {
 
         session = MediaSessionCompat(this, "MyMusicService").apply {
             setFlags(
-                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                FLAG_HANDLES_MEDIA_BUTTONS or
                         MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
             )
             setCallback(callback)
@@ -183,7 +185,7 @@ class MyMusicService : MediaBrowserServiceCompat() {
     }
 
     private fun createCyberArtworkBitmap(title: String): Bitmap {
-        val bitmap = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(160, 160)
         val canvas = Canvas(bitmap)
         val paint = Paint().apply {
             color = Color.parseColor("#0284C7")

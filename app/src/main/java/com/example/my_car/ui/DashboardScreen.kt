@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
@@ -34,12 +33,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.my_car.data.model.MediaTrack
 import com.example.my_car.ui.theme.*
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 sealed class CarScreen {
     object Dashboard : CarScreen()
@@ -52,13 +51,10 @@ sealed class CarScreen {
 
 @Composable
 fun DashboardScreen(
-    currentTrack: MediaTrack?,
-    isPlaying: Boolean,
     audioTracksCount: Int,
     videoTracksCount: Int,
     favoritesCount: Int,
     onNavigate: (CarScreen) -> Unit,
-    onPlayPauseClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
@@ -81,7 +77,7 @@ fun DashboardScreen(
             timeDigitsText = timeFormat.format(now)
             amPmText = if (amPmFormat.format(now).contains("ص")) "صباحاً" else "مساءً"
             currentDateText = dateFormat.format(now)
-            delay(1000)
+            delay(1000.milliseconds)
         }
     }
 
@@ -290,7 +286,7 @@ fun DashboardScreen(
                     // Card 2: المرئيات (Video Player Card)
                     item {
                         PrimaryDashboardCard(
-                            title = "المرئيات والفيديوهات",
+                            title = "الصور والمرئيات",
                             subtitle = "$videoTracksCount مقطع فيديو",
                             icon = Icons.Default.Movie,
                             accentColor = Color(0xFFFF5252),

@@ -217,13 +217,10 @@ class MainActivity : ComponentActivity() {
                             when (currentScreen.value) {
                                 CarScreen.Dashboard -> {
                                     DashboardScreen(
-                                        currentTrack = currentTrackState.value,
-                                        isPlaying = isPlayingState.value,
                                         audioTracksCount = audioTracksState.size,
                                         videoTracksCount = videoTracksState.size,
-                                        favoritesCount = audioTracksState.count { it.isFavorite },
+                                        favoritesCount = audioTracksState.count { it.isFavorite } + videoTracksState.count { it.isFavorite } + photoTracksState.count { it.isFavorite },
                                         onNavigate = { screen -> currentScreen.value = screen },
-                                        onPlayPauseClick = { togglePlayPause() },
                                         modifier = Modifier.padding(innerPadding)
                                     )
                                 }
@@ -255,6 +252,8 @@ class MainActivity : ComponentActivity() {
                                     VideoPlayerScreen(
                                         videos = videoTracksState,
                                         photos = photoTracksState,
+                                        hasPhotoPermission = checkPhotoPermission(this@MainActivity),
+                                        onRequestPhotoPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
                                         onBack = { currentScreen.value = CarScreen.Dashboard },
                                         onToggleFavorite = { track -> toggleFavorite(track) },
                                         modifier = Modifier.padding(innerPadding)
@@ -272,7 +271,7 @@ class MainActivity : ComponentActivity() {
 
                                 CarScreen.Favorites -> {
                                     FavoritesScreen(
-                                        tracks = audioTracksState.filter { it.isFavorite },
+                                        tracks = audioTracksState + videoTracksState + photoTracksState,
                                         favoriteVersion = favoriteVersionState.intValue,
                                         onBack = { currentScreen.value = CarScreen.Dashboard },
                                         onTrackSelect = { track -> playTrack(track) },

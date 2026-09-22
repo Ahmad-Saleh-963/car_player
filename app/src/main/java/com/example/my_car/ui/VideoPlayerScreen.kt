@@ -8,6 +8,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,6 +46,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -71,6 +76,8 @@ import java.util.Locale
 fun VideoPlayerScreen(
     videos: List<MediaTrack>,
     photos: List<MediaTrack> = emptyList(),
+    hasPhotoPermission: Boolean = true,
+    onRequestPhotoPermission: () -> Unit = {},
     onBack: () -> Unit,
     onToggleFavorite: (MediaTrack) -> Unit = {},
     modifier: Modifier = Modifier
@@ -78,27 +85,40 @@ fun VideoPlayerScreen(
     var selectedVideo by remember { mutableStateOf<MediaTrack?>(null) }
     var selectedPhoto by remember { mutableStateOf<MediaTrack?>(null) }
 
-    if (selectedVideo != null) {
-        MxVideoPlayerView(
-            video = selectedVideo!!,
-            onClosePlayer = { selectedVideo = null }
-        )
-    } else if (selectedPhoto != null) {
-        FullscreenPhotoViewer(
-            photo = selectedPhoto!!,
-            onToggleFavorite = onToggleFavorite,
-            onCloseViewer = { selectedPhoto = null }
-        )
-    } else {
+    // 🚀 PRESERVE TAB FILTER STATE ACROSS VIEWING PHOTOS/VIDEOS
+    var activeFilterTab by remember { mutableIntStateOf(0) } // 0 = الفيديوهات 🎬, 1 = الصور 🖼️, 2 = المجلدات 📁, 3 = المفضلة ⭐
+
+    Box(modifier = modifier.fillMaxSize()) {
+        // Main Visuals Gallery View
         VisualsGalleryView(
             videos = videos,
             photos = photos,
+            hasPhotoPermission = hasPhotoPermission,
+            onRequestPhotoPermission = onRequestPhotoPermission,
+            selectedFilter = activeFilterTab,
+            onFilterChange = { activeFilterTab = it },
             onBack = onBack,
             onVideoSelect = { selectedVideo = it },
             onPhotoSelect = { selectedPhoto = it },
-            onToggleFavorite = onToggleFavorite,
-            modifier = modifier
+            onToggleFavorite = onToggleFavorite
         )
+
+        // Video Player Overlay
+        if (selectedVideo != null) {
+            MxVideoPlayerView(
+                video = selectedVideo!!,
+                onClosePlayer = { selectedVideo = null }
+            )
+        }
+
+        // Fullscreen Photo Viewer Overlay (Preserves Gallery Tab State Behind It!)
+        if (selectedPhoto != null) {
+            FullscreenPhotoViewer(
+                photo = selectedPhoto!!,
+                onToggleFavorite = onToggleFavorite,
+                onCloseViewer = { selectedPhoto = null }
+            )
+        }
     }
 }
 
@@ -106,6 +126,10 @@ fun VideoPlayerScreen(
 fun VisualsGalleryView(
     videos: List<MediaTrack>,
     photos: List<MediaTrack>,
+    hasPhotoPermission: Boolean,
+    onRequestPhotoPermission: () -> Unit,
+    selectedFilter: Int,
+    onFilterChange: (Int) -> Unit,
     onBack: () -> Unit,
     onVideoSelect: (MediaTrack) -> Unit,
     onPhotoSelect: (MediaTrack) -> Unit,
@@ -113,7 +137,6 @@ fun VisualsGalleryView(
     modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
-    var selectedFilter by remember { mutableIntStateOf(0) } // 0 = الفيديوهات 🎬, 1 = الصور 🖼️, 2 = المجلدات 📁, 3 = المفضلة ⭐
 
     // Expanded Folder State for Tab 2
     var expandedFolder by remember { mutableStateOf<String?>(null) }
@@ -186,7 +209,7 @@ fun VisualsGalleryView(
                     item {
                         FilterChip(
                             selected = selectedFilter == 0,
-                            onClick = { selectedFilter = 0 },
+                            onClick = { onFilterChange(0) },
                             label = { Text("الفيديوهات 🎬 (${videos.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                             shape = RoundedCornerShape(20.dp)
                         )
@@ -194,7 +217,7 @@ fun VisualsGalleryView(
                     item {
                         FilterChip(
                             selected = selectedFilter == 1,
-                            onClick = { selectedFilter = 1 },
+                            onClick = { onFilterChange(1) },
                             label = { Text("الصور 🖼️ (${photos.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                             shape = RoundedCornerShape(20.dp)
                         )
@@ -202,7 +225,7 @@ fun VisualsGalleryView(
                     item {
                         FilterChip(
                             selected = selectedFilter == 2,
-                            onClick = { selectedFilter = 2 },
+                            onClick = { onFilterChange(2) },
                             label = { Text("المجلدات 📁 (${folderGroups.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                             shape = RoundedCornerShape(20.dp)
                         )
@@ -210,7 +233,7 @@ fun VisualsGalleryView(
                     item {
                         FilterChip(
                             selected = selectedFilter == 3,
-                            onClick = { selectedFilter = 3 },
+                            onClick = { onFilterChange(3) },
                             label = { Text("المفضلة ⭐ (${favorites.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
                             shape = RoundedCornerShape(20.dp)
                         )
@@ -246,8 +269,14 @@ fun VisualsGalleryView(
                     }
 
                     1 -> {
-                        // 🖼️ 1: PHOTOS GRID
-                        if (photos.isEmpty()) {
+                        // 🖼️ 1: PHOTOS GRID (With Permission Check Hint)
+                        if (!hasPhotoPermission) {
+                            PermissionDeniedHintCard(
+                                title = "صلاحية الوصول للصور معطلة 🔒",
+                                description = "يلزم منح صلاحية وصول الملفات والصور لعرض استوديو الصور في مشغل السيارة.",
+                                onRequestPermission = onRequestPhotoPermission
+                            )
+                        } else if (photos.isEmpty()) {
                             EmptyStateView("لم يتم العثور على صور أو لقطات محلياً في الذاكرة.")
                         } else {
                             LazyVerticalGrid(
@@ -400,6 +429,74 @@ fun VisualsGalleryView(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PermissionDeniedHintCard(
+    title: String,
+    description: String,
+    onRequestPermission: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(0.90f),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, AutomotiveCyanAccent.copy(alpha = 0.5f)),
+            shadowElevation = 4.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = AutomotiveCyanAccent.copy(alpha = 0.15f),
+                    modifier = Modifier.size(50.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Image,
+                            contentDescription = null,
+                            tint = AutomotiveCyanAccent,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+
+                Button(
+                    onClick = onRequestPermission,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AutomotiveCyanAccent,
+                        contentColor = Color(0xFF0F172A)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("منح صلاحية الصور 🔓", fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -580,7 +677,7 @@ fun PhotoGridCardItem(
     }
 }
 
-// 🖼️ FULLSCREEN PHOTO VIEWER WITH ZOOM & PAN
+// 🖼️ ULTRA-FAST FULLSCREEN PHOTO VIEWER WITH REAL-TIME PINCH-TO-ZOOM & PAN
 @Composable
 fun FullscreenPhotoViewer(
     photo: MediaTrack,
@@ -589,78 +686,131 @@ fun FullscreenPhotoViewer(
 ) {
     val context = LocalContext.current
 
+    // Zoom & Pan Transformation States
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    var showControls by remember { mutableStateOf(true) }
+
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
-            // Fullscreen Photo
-            AsyncImage(
-                model = ImageRequest.Builder(context)
-                    .data(photo.uri)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = photo.title,
-                contentScale = ContentScale.Fit,
+            // Fullscreen Zoomable Photo Surface
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clickable { onCloseViewer() }
-            )
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            val newScale = (scale * zoom).coerceIn(1f, 5f)
+                            scale = newScale
+                            if (newScale > 1f) {
+                                offsetX += pan.x
+                                offsetY += pan.y
+                            } else {
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                if (scale > 1.1f) {
+                                    scale = 1f
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                } else {
+                                    scale = 2.5f
+                                }
+                            },
+                            onTap = {
+                                showControls = !showControls
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(photo.uri)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = photo.title,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer(
+                            scaleX = scale,
+                            scaleY = scale,
+                            translationX = offsetX,
+                            translationY = offsetY
+                        )
+                )
+            }
 
-            // Header Control Overlay
-            Row(
+            // Header Control Overlay (Toggles on Single Tap, Always Available via Dedicated Back Button)
+            AnimatedVisibility(
+                visible = showControls,
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .background(Color.Black.copy(alpha = 0.6f))
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black.copy(alpha = 0.65f))
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        IconButton(
+                            onClick = onCloseViewer,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "خروج",
+                                tint = Color.White
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = photo.title,
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                                maxLines = 1
+                            )
+                            Text(
+                                text = "🖼️ ${photo.folderName}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+
                     IconButton(
-                        onClick = onCloseViewer,
+                        onClick = { onToggleFavorite(photo) },
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(40.dp)
                             .background(Color.White.copy(alpha = 0.2f), CircleShape)
                     ) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "خروج",
-                            tint = Color.White
+                            imageVector = if (photo.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "مفضل",
+                            tint = if (photo.isFavorite) Color(0xFFFF4081) else Color.White
                         )
                     }
-
-                    Column {
-                        Text(
-                            text = photo.title,
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = Color.White,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "📁 ${photo.folderName}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.7f)
-                        )
-                    }
-                }
-
-                IconButton(
-                    onClick = { onToggleFavorite(photo) },
-                    modifier = Modifier
-                        .size(38.dp)
-                        .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = if (photo.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        contentDescription = "مفضل",
-                        tint = if (photo.isFavorite) Color(0xFFFF4081) else Color.White
-                    )
                 }
             }
         }

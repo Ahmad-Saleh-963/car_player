@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
@@ -69,6 +70,7 @@ fun SettingsScreen(
     // Dynamic Live Permission Status States
     var isAudioGranted by remember { mutableStateOf(checkAudioPermission(context)) }
     var isVideoGranted by remember { mutableStateOf(checkVideoPermission(context)) }
+    var isPhotoGranted by remember { mutableStateOf(checkPhotoPermission(context)) }
     var isNotificationGranted by remember { mutableStateOf(checkNotificationPermission(context)) }
     var isOverlayGranted by remember { mutableStateOf(checkOverlayPermission(context)) }
     var isAutoStartGranted by remember { mutableStateOf(checkAutoStartPermission(context)) }
@@ -79,6 +81,7 @@ fun SettingsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 isAudioGranted = checkAudioPermission(context)
                 isVideoGranted = checkVideoPermission(context)
+                isPhotoGranted = checkPhotoPermission(context)
                 isNotificationGranted = checkNotificationPermission(context)
                 isOverlayGranted = checkOverlayPermission(context)
                 isAutoStartGranted = checkAutoStartPermission(context)
@@ -102,6 +105,13 @@ fun SettingsScreen(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         isVideoGranted = granted || checkVideoPermission(context)
+        if (!granted) openAppSettings(context)
+    }
+
+    val photoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        isPhotoGranted = granted || checkPhotoPermission(context)
         if (!granted) openAppSettings(context)
     }
 
@@ -284,7 +294,7 @@ fun SettingsScreen(
                             // Item 2: Video Storage Permission
                             PermissionStatusRowItem(
                                 title = "2. وصول مقاطع الفيديو والمرئيات",
-                                subtitle = "عرض الاستوديو وتشغيل مقاطع الفيديو المحلية",
+                                subtitle = "عرض تشغيل مقاطع الفيديو المحلية في الذاكرة",
                                 icon = Icons.Default.Movie,
                                 isGranted = isVideoGranted,
                                 isDark = isDark,
@@ -299,9 +309,27 @@ fun SettingsScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                            // Item 3: Notification & Background Service Permission
+                            // Item 3: Photo Storage Permission
                             PermissionStatusRowItem(
-                                title = "3. إشعارات ومشغل الخلفية",
+                                title = "3. وصول الصور والاستوديو",
+                                subtitle = "عرض الصور ومعرض اللقطات في مشغل السيارة",
+                                icon = Icons.Default.Image,
+                                isGranted = isPhotoGranted,
+                                isDark = isDark,
+                                onGrantClick = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        photoLauncher.launch(Manifest.permission.READ_MEDIA_IMAGES)
+                                    } else {
+                                        photoLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                                    }
+                                }
+                            )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                            // Item 4: Notification & Background Service Permission
+                            PermissionStatusRowItem(
+                                title = "4. إشعارات ومشغل الخلفية",
                                 subtitle = "عرض شريط التحكم الثابت بمركز الإشعارات وشاشة القفل",
                                 icon = Icons.Default.Notifications,
                                 isGranted = isNotificationGranted,
@@ -317,9 +345,9 @@ fun SettingsScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                            // Item 4: System Overlay Permission (الظهور فوق التطبيقات)
+                            // Item 5: System Overlay Permission (الظهور فوق التطبيقات)
                             PermissionStatusRowItem(
-                                title = "4. الظهور فوق التطبيقات (Overlay)",
+                                title = "5. الظهور فوق التطبيقات (Overlay)",
                                 subtitle = "فتح شاشة المشغل مباشرة فوق التطبيقات فور تشغيل الشاشة",
                                 icon = Icons.Default.PowerSettingsNew,
                                 isGranted = isOverlayGranted,
@@ -341,9 +369,9 @@ fun SettingsScreen(
 
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                            // Item 5: Auto Start System Manager
+                            // Item 6: Auto Start System Manager
                             PermissionStatusRowItem(
-                                title = "5. التشغيل التلقائي للنظام (Auto-Start)",
+                                title = "6. التشغيل التلقائي للنظام (Auto-Start)",
                                 subtitle = "إعطاء الأولوية للنظام للبدء التلقائي وإلغاء قيود البطارية",
                                 icon = Icons.Default.DirectionsCar,
                                 isGranted = isAutoStartGranted,
@@ -472,6 +500,15 @@ fun checkAudioPermission(context: Context): Boolean {
 fun checkVideoPermission(context: Context): Boolean {
     val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         Manifest.permission.READ_MEDIA_VIDEO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+    return ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+}
+
+fun checkPhotoPermission(context: Context): Boolean {
+    val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_IMAGES
     } else {
         Manifest.permission.READ_EXTERNAL_STORAGE
     }
