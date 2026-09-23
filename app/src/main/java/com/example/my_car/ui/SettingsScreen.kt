@@ -149,13 +149,13 @@ fun SettingsScreen(
             modifier = modifier
                 .fillMaxSize()
                 .background(bgGradient)
-                .padding(14.dp)
+                .padding(12.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Header Bar
                 Row(
@@ -172,6 +172,7 @@ fun SettingsScreen(
                             }
                         },
                         shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.size(38.dp),
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                             containerColor = if (isDark) Color(0xFF263345) else Color(0xFFCBD5E1),
                             contentColor = MaterialTheme.colorScheme.onSurface
@@ -179,37 +180,38 @@ fun SettingsScreen(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "الرجوع"
+                            contentDescription = "الرجوع",
+                            modifier = Modifier.size(20.dp)
                         )
                     }
 
                     Text(
                         text = if (isPermissionsViewOpen) "جدول إدارة الصلاحيات 🔐" else "إعدادات التطبيق ⚙️",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 18.sp),
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
 
                 if (!isPermissionsViewOpen) {
-                    // 🌟 MAIN SETTINGS VIEW: HUD SCREENSAVER + TELEMETRY TOGGLES + PERMISSIONS CARD
+                    // 🌟 MAIN SETTINGS VIEW: COMPACT ELEGANT CARDS
 
                     // Card 1: 🌙 Ambient HUD ScreenSaver Setting
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .border(
                                 width = 1.dp,
                                 color = AutomotiveCyanAccent.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(20.dp)
+                                shape = RoundedCornerShape(16.dp)
                             ),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 4.dp
+                        shadowElevation = 3.dp
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -218,20 +220,20 @@ fun SettingsScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = AutomotiveCyanAccent.copy(alpha = 0.18f),
-                                        modifier = Modifier.size(46.dp)
+                                        modifier = Modifier.size(38.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 imageVector = Icons.Default.Nightlight,
                                                 contentDescription = null,
                                                 tint = AutomotiveCyanAccent,
-                                                modifier = Modifier.size(24.dp)
+                                                modifier = Modifier.size(20.dp)
                                             )
                                         }
                                     }
@@ -241,14 +243,13 @@ fun SettingsScreen(
                                             text = "شاشة التوقف القيادية (HUD) 🌙",
                                             style = MaterialTheme.typography.titleMedium.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 16.sp
+                                                fontSize = 15.sp
                                             ),
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
-                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = "تحويل الشاشة لساعة رقمية سوداء وعداد سرعة مباشر عند عدم اللمس",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -265,7 +266,7 @@ fun SettingsScreen(
                             }
 
                             if (isHudEnabled) {
-                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                                 Column(
                                     modifier = Modifier.fillMaxWidth(),
@@ -273,7 +274,7 @@ fun SettingsScreen(
                                 ) {
                                     Text(
                                         text = "مهلة عدم اللمس لتفعيل شاشة التوقف: ($hudTimeoutSec ثانية)",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
 
@@ -285,8 +286,8 @@ fun SettingsScreen(
                                             FilterChip(
                                                 selected = hudTimeoutSec == timeout,
                                                 onClick = { onChangeHudTimeoutSec(timeout) },
-                                                label = { Text("$timeout ثانية", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                                                shape = RoundedCornerShape(12.dp),
+                                                label = { Text("$timeout ثانية", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                                                shape = RoundedCornerShape(10.dp),
                                                 colors = FilterChipDefaults.filterChipColors(
                                                     selectedContainerColor = AutomotiveCyanAccent,
                                                     selectedLabelColor = Color(0xFF0F172A)
@@ -303,19 +304,19 @@ fun SettingsScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .border(
                                 width = 1.dp,
                                 color = AutomotiveCyanAccent.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(20.dp)
+                                shape = RoundedCornerShape(16.dp)
                             ),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 4.dp
+                        shadowElevation = 3.dp
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -324,20 +325,20 @@ fun SettingsScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     Surface(
-                                        shape = RoundedCornerShape(12.dp),
+                                        shape = RoundedCornerShape(10.dp),
                                         color = AutomotiveCyanAccent.copy(alpha = 0.18f),
-                                        modifier = Modifier.size(46.dp)
+                                        modifier = Modifier.size(38.dp)
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             Icon(
                                                 imageVector = Icons.Default.Speed,
                                                 contentDescription = null,
                                                 tint = AutomotiveCyanAccent,
-                                                modifier = Modifier.size(24.dp)
+                                                modifier = Modifier.size(20.dp)
                                             )
                                         }
                                     }
@@ -347,14 +348,13 @@ fun SettingsScreen(
                                             text = "إظهار عدادات وقياسات السيارة 📊",
                                             style = MaterialTheme.typography.titleMedium.copy(
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 16.sp
+                                                fontSize = 15.sp
                                             ),
                                             color = MaterialTheme.colorScheme.onSurface
                                         )
-                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = "عرض لوحة السرعة، الحرارة، جهة البطارية والـ RPM بالواجهة الرئيسية",
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -370,7 +370,7 @@ fun SettingsScreen(
                                 )
                             }
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -380,7 +380,7 @@ fun SettingsScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = "عرض العدادات على كافة الهواتف أيضاً 📱",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
@@ -402,45 +402,44 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Card 3: Permissions Manager Entry Option
+                    // Card 3: Permissions Manager Entry Option (Compact 80.dp Height)
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(110.dp)
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(16.dp))
                             .clickable { isPermissionsViewOpen = true }
                             .border(
                                 width = 1.dp,
                                 color = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
-                                shape = RoundedCornerShape(20.dp)
+                                shape = RoundedCornerShape(16.dp)
                             ),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
-                        shadowElevation = 6.dp
+                        shadowElevation = 4.dp
                     ) {
                         Row(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(20.dp),
+                                .fillMaxWidth()
+                                .padding(14.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = RoundedCornerShape(10.dp),
                                     color = if (isDark) AutomotiveCyanAccent.copy(alpha = 0.2f) else AutomotiveBluePrimaryLight.copy(alpha = 0.15f),
-                                    modifier = Modifier.size(52.dp)
+                                    modifier = Modifier.size(42.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = Icons.Default.Security,
                                             contentDescription = "إدارة الصلاحيات",
                                             tint = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.size(22.dp)
                                         )
                                     }
                                 }
@@ -448,16 +447,15 @@ fun SettingsScreen(
                                 Column {
                                     Text(
                                         text = "إدارة الصلاحيات 🔐",
-                                        style = MaterialTheme.typography.titleLarge.copy(
+                                        style = MaterialTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 18.sp
+                                            fontSize = 16.sp
                                         ),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = "اضغط هنا لعرض وتفعيل كافة صلاحيات التطبيق والتشغيل التلقائي",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -468,32 +466,32 @@ fun SettingsScreen(
                                 contentDescription = "فتح",
                                 tint = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
                                 modifier = Modifier
-                                    .size(24.dp)
+                                    .size(20.dp)
                                     .graphicsLayer(rotationZ = 180f)
                             )
                         }
                     }
                 } else {
-                    // 🌟 FULL PERMISSIONS VIEW: Displays all permissions with live statuses & action buttons
+                    // 🌟 FULL PERMISSIONS VIEW: Compact Permission Items List
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(16.dp),
                         color = MaterialTheme.colorScheme.surface,
                         border = BorderStroke(1.dp, AutomotiveCyanAccent.copy(alpha = 0.5f)),
-                        shadowElevation = 4.dp
+                        shadowElevation = 3.dp
                     ) {
                         Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
                                 text = "قائمة كافة الصلاحيات المطلوبة لمشغل السيارة:",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "تتيح لك هذه الواجهة التحكم الشامل بكافة الصلاحيات. في حال كانت الصلاحية مفعّلة يظهر رمز الصحة الأخضر ✅، وفي حال كانت معطلة يظهر زر لمنحها فورياً مع تحديث حالتها مباشرة.",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "تتيح لك هذه الواجهة التحكم الشامل بكافة الصلاحيات مع تحديث حالتها مباشرة.",
+                                style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
 
@@ -515,7 +513,7 @@ fun SettingsScreen(
                                 }
                             )
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                             // Item 2: Video Storage Permission
                             PermissionStatusRowItem(
@@ -533,7 +531,7 @@ fun SettingsScreen(
                                 }
                             )
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                             // Item 3: Photo Storage Permission
                             PermissionStatusRowItem(
@@ -551,7 +549,7 @@ fun SettingsScreen(
                                 }
                             )
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                             // Item 4: Notification & Background Service Permission
                             PermissionStatusRowItem(
@@ -569,7 +567,7 @@ fun SettingsScreen(
                                 }
                             )
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                             // Item 5: System Overlay Permission (الظهور فوق التطبيقات)
                             PermissionStatusRowItem(
@@ -593,7 +591,7 @@ fun SettingsScreen(
                                 }
                             )
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                             // Item 6: Auto Start System Manager
                             PermissionStatusRowItem(
@@ -606,7 +604,7 @@ fun SettingsScreen(
                                 onGrantClick = { openAutoStartSettings(context) }
                             )
 
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                             // Item 7: Screen Brightness System Settings Permission (WRITE_SETTINGS)
                             PermissionStatusRowItem(
@@ -637,14 +635,14 @@ fun PermissionStatusRowItem(
     onGrantClick: () -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -654,16 +652,16 @@ fun PermissionStatusRowItem(
                 modifier = Modifier.weight(1f)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     color = if (isGranted) Color(0xFF10B981).copy(alpha = 0.18f) else Color(0xFFFFB300).copy(alpha = 0.18f),
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(34.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
                             tint = if (isGranted) Color(0xFF10B981) else Color(0xFFFFB300),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
@@ -671,12 +669,12 @@ fun PermissionStatusRowItem(
                 Column {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = subtitle,
-                        style = MaterialTheme.typography.labelSmall,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -685,12 +683,12 @@ fun PermissionStatusRowItem(
             if (isGranted) {
                 // Status Badge: Granted (مفعلة ✅)
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
                     color = Color(0xFF10B981).copy(alpha = 0.18f),
                     border = BorderStroke(1.dp, Color(0xFF10B981))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
@@ -698,11 +696,11 @@ fun PermissionStatusRowItem(
                             imageVector = Icons.Default.CheckCircle,
                             contentDescription = null,
                             tint = Color(0xFF10B981),
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                         Text(
                             text = "مفعلة ✅",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
                             color = Color(0xFF10B981)
                         )
                     }
@@ -711,7 +709,8 @@ fun PermissionStatusRowItem(
                 // Action Button: Grant Permission (منح الصلاحية 🔓)
                 Button(
                     onClick = onGrantClick,
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
                         contentColor = if (isDark) Color(0xFF0F172A) else Color.White
@@ -719,7 +718,7 @@ fun PermissionStatusRowItem(
                 ) {
                     Text(
                         text = overrideButtonText ?: "منح الصلاحية 🔓",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     )
                 }
             }
