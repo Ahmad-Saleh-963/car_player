@@ -1,8 +1,12 @@
 package com.example.my_car.ui.components
 
 import android.app.Activity
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioManager
+import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -20,8 +24,129 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.my_car.ui.theme.AutomotiveBluePrimaryLight
 import com.example.my_car.ui.theme.AutomotiveCyanAccent
+
+// 🚗 ROCK-SOLID HARDWARE HELPER FOR CAR HEAD UNITS & SMARTPHONES
+object CarHardwareHelper {
+
+    fun setVolume(context: Context, audioManager: AudioManager, targetVolume: Int, maxVolume: Int) {
+        val safeVol = targetVolume.coerceIn(0, maxVolume)
+
+        // 1. Standard Android AudioManager Streams
+        try {
+            audioManager.setStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                safeVol,
+                AudioManager.FLAG_SHOW_UI
+            )
+            audioManager.setStreamVolume(
+                AudioManager.STREAM_SYSTEM,
+                safeVol,
+                0
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        // 2. Car Head Unit Vendor MCU Broadcast Intents (Topway, TS10, FYT, Microntek, Joying, FlyAudio)
+        val carVolumeIntents = listOf(
+            Intent("android.media.VOLUME_CHANGED_ACTION").apply {
+                putExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", AudioManager.STREAM_MUSIC)
+                putExtra("android.media.EXTRA_VOLUME_STREAM_VALUE", safeVol)
+                putExtra("android.media.EXTRA_PREV_VOLUME_STREAM_VALUE", safeVol)
+            },
+            Intent("com.microntek.volume.change").apply {
+                putExtra("volume", safeVol)
+                putExtra("max_volume", maxVolume)
+            },
+            Intent("com.ts.intent.action.VOLUME_CHANGE").apply {
+                putExtra("volume", safeVol)
+            },
+            Intent("com.flyaudio.intent.action.VOLUME_CHANGED").apply {
+                putExtra("volume", safeVol)
+            }
+        )
+
+        for (intent in carVolumeIntents) {
+            try {
+                context.sendBroadcast(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun setBrightness(context: Context, targetBrightness: Float) {
+        val safeB = targetBrightness.coerceIn(0.05f, 1.0f)
+        val bInt = (safeB * 255).toInt().coerceIn(12, 255)
+
+        // 1. Current Window Attributes (Works 100% on Smartphones & App Windows)
+        (context as? Activity)?.let { act ->
+            try {
+                val lp = act.window.attributes
+                lp.screenBrightness = safeB
+                act.window.attributes = lp
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 2. System Hardware Backlight (Requires WRITE_SETTINGS on API 23+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (Settings.System.canWrite(context)) {
+                try {
+                    Settings.System.putInt(
+                        context.contentResolver,
+                        Settings.System.SCREEN_BRIGHTNESS_MODE,
+                        Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+                    )
+                    Settings.System.putInt(
+                        context.contentResolver,
+                        Settings.System.SCREEN_BRIGHTNESS,
+                        bInt
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } else {
+            try {
+                Settings.System.putInt(
+                    context.contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
+                )
+                Settings.System.putInt(
+                    context.contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS,
+                    bInt
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 3. Car Head Unit MCU Brightness Intents
+        val carBrightnessIntents = listOf(
+            Intent("com.ts.intent.action.BRIGHTNESS_CHANGE").apply {
+                putExtra("brightness", bInt)
+            },
+            Intent("com.microntek.brightness.change").apply {
+                putExtra("brightness", bInt)
+            }
+        )
+
+        for (intent in carBrightnessIntents) {
+            try {
+                context.sendBroadcast(intent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+}
 
 @Composable
 fun AutomotiveHardwareControlBar(
@@ -43,62 +168,56 @@ fun AutomotiveHardwareControlBar(
         mutableIntStateOf(audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
     }
 
-    var isMuted by remember { mutableStateOf(false) }
-    var previousVolume by remember { mutableIntStateOf(currentVolume) }
+    var isMuted by remember { mutableStateOf(currentVolume == 0) }
+    var previousVolume by remember { mutableIntStateOf(if (currentVolume > 0) currentVolume else (maxVolume / 2)) }
 
+    // Initial Screen Brightness Reading
     var brightness by remember {
-        mutableFloatStateOf(0.75f)
+        val initialB = try {
+            val currentSysB = Settings.System.getInt(
+                context.contentResolver,
+                Settings.System.SCREEN_BRIGHTNESS
+            )
+            (currentSysB / 255f).coerceIn(0.1f, 1.0f)
+        } catch (e: Exception) {
+            0.75f
+        }
+        mutableFloatStateOf(initialB)
     }
 
-    // Failsafe Volume Adjustment Function for Android Head Units & Legacy Android 5.0+
-    val setCarVolume = { volInt: Int ->
-        val safeVol = volInt.coerceIn(0, maxVolume)
-        currentVolume = safeVol
-        isMuted = safeVol == 0
+    // ⚡ LIVE SYNC RECEIVER: Steering Wheel Knobs & Physical Car Volume Controls
+    DisposableEffect(context) {
+        val filter = IntentFilter().apply {
+            addAction("android.media.VOLUME_CHANGED_ACTION")
+            addAction("com.microntek.volume.change")
+            addAction("com.ts.intent.action.VOLUME_CHANGE")
+        }
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                val liveVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                currentVolume = liveVol
+                isMuted = liveVol == 0
+            }
+        }
 
         try {
-            audioManager.setStreamVolume(
-                AudioManager.STREAM_MUSIC,
-                safeVol,
-                AudioManager.FLAG_SHOW_UI
-            )
-            audioManager.setStreamVolume(
-                AudioManager.STREAM_SYSTEM,
-                safeVol,
-                0
+            ContextCompat.registerReceiver(
+                context,
+                receiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
             )
         } catch (e: Exception) {
             e.printStackTrace()
         }
-    }
 
-    // Failsafe System Hardware Brightness Adjustment for Android Head Units
-    val setCarBrightness = { newB: Float ->
-        val safeB = newB.coerceIn(0.05f, 1.0f)
-        brightness = safeB
-
-        // 1. Update Current Activity Window Attributes
-        (context as? Activity)?.let { act ->
-            val lp = act.window.attributes
-            lp.screenBrightness = safeB
-            act.window.attributes = lp
-        }
-
-        // 2. Hardware System Backlight Value (0..255) for Legacy Android 5.0+ & Car Screen Backlights
-        try {
-            val bInt = (safeB * 255).toInt().coerceIn(12, 255)
-            Settings.System.putInt(
-                context.contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
-            )
-            Settings.System.putInt(
-                context.contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS,
-                bInt
-            )
-        } catch (e: Exception) {
-            e.printStackTrace()
+        onDispose {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
@@ -123,12 +242,16 @@ fun AutomotiveHardwareControlBar(
             ) {
                 IconButton(
                     onClick = {
-                        if (isMuted) {
+                        if (isMuted || currentVolume == 0) {
                             val restoreVol = previousVolume.coerceAtLeast(1)
-                            setCarVolume(restoreVol)
+                            currentVolume = restoreVol
+                            isMuted = false
+                            CarHardwareHelper.setVolume(context, audioManager, restoreVol, maxVolume)
                         } else {
                             previousVolume = currentVolume
-                            setCarVolume(0)
+                            currentVolume = 0
+                            isMuted = true
+                            CarHardwareHelper.setVolume(context, audioManager, 0, maxVolume)
                         }
                     },
                     modifier = Modifier.size(32.dp)
@@ -160,7 +283,10 @@ fun AutomotiveHardwareControlBar(
                     Slider(
                         value = currentVolume.toFloat(),
                         onValueChange = { newVol ->
-                            setCarVolume(newVol.toInt())
+                            val volInt = newVol.toInt()
+                            currentVolume = volInt
+                            isMuted = volInt == 0
+                            CarHardwareHelper.setVolume(context, audioManager, volInt, maxVolume)
                         },
                         valueRange = 0f..maxVolume.toFloat(),
                         colors = SliderDefaults.colors(
@@ -197,7 +323,9 @@ fun AutomotiveHardwareControlBar(
                     imageVector = Icons.Default.WbSunny,
                     contentDescription = "الإضاءة",
                     tint = Color(0xFFFFB300),
-                    modifier = Modifier.size(20.dp).padding(start = 2.dp)
+                    modifier = Modifier
+                        .size(20.dp)
+                        .padding(start = 2.dp)
                 )
 
                 Column(modifier = Modifier.weight(1f)) {
@@ -220,7 +348,8 @@ fun AutomotiveHardwareControlBar(
                     Slider(
                         value = brightness,
                         onValueChange = { newB ->
-                            setCarBrightness(newB)
+                            brightness = newB
+                            CarHardwareHelper.setBrightness(context, newB)
                         },
                         valueRange = 0.05f..1.0f,
                         colors = SliderDefaults.colors(

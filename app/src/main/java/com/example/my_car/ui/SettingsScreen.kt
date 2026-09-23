@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,6 +75,7 @@ fun SettingsScreen(
     var isNotificationGranted by remember { mutableStateOf(checkNotificationPermission(context)) }
     var isOverlayGranted by remember { mutableStateOf(checkOverlayPermission(context)) }
     var isAutoStartGranted by remember { mutableStateOf(checkAutoStartPermission(context)) }
+    var isWriteSettingsGranted by remember { mutableStateOf(Settings.System.canWrite(context)) }
 
     // Refresh states automatically when resuming screen
     DisposableEffect(lifecycleOwner) {
@@ -85,6 +87,7 @@ fun SettingsScreen(
                 isNotificationGranted = checkNotificationPermission(context)
                 isOverlayGranted = checkOverlayPermission(context)
                 isAutoStartGranted = checkAutoStartPermission(context)
+                isWriteSettingsGranted = Settings.System.canWrite(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -379,6 +382,19 @@ fun SettingsScreen(
                                 overrideButtonText = "تفعيل التشغيل ⚡",
                                 onGrantClick = { openAutoStartSettings(context) }
                             )
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                            // Item 7: Screen Brightness System Settings Permission (WRITE_SETTINGS)
+                            PermissionStatusRowItem(
+                                title = "7. التحكم بإضاءة النظام وشاشة السيارة",
+                                subtitle = "تعديل إشراق وسطوع شاشة السيارة من داخل التطبيق",
+                                icon = Icons.Default.WbSunny,
+                                isGranted = isWriteSettingsGranted,
+                                isDark = isDark,
+                                overrideButtonText = "تفعيل الإضاءة ☀️",
+                                onGrantClick = { openWriteSettings(context) }
+                            )
                         }
                     }
                 }
@@ -553,6 +569,19 @@ fun checkAutoStartPermission(context: Context): Boolean {
     }
 
     return isBootEnabled && (isIgnoringBattery || canOverlay)
+}
+
+fun openWriteSettings(context: Context) {
+    try {
+        val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+            data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+        Toast.makeText(context, "يرجى التفعيل للسماح للتطبيق بتعديل إضاءة الشاشة تلقائياً", Toast.LENGTH_LONG).show()
+    } catch (e: Exception) {
+        openAppSettings(context)
+    }
 }
 
 fun openAppSettings(context: Context) {
