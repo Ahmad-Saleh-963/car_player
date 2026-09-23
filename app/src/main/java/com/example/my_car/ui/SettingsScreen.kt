@@ -49,12 +49,12 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.my_car.receiver.BootReceiver
 import com.example.my_car.ui.theme.*
-import androidx.core.net.toUri
 
 @SuppressLint("UseKtx")
 @Composable
@@ -62,7 +62,9 @@ fun SettingsScreen(
     hasMediaPermission: Boolean,
     onRequestMediaPermission: () -> Unit,
     isTelemetryVisible: Boolean = true,
+    showTelemetryOnAllDevices: Boolean = false,
     onToggleTelemetryVisibility: (Boolean) -> Unit = {},
+    onToggleShowTelemetryOnAllDevices: (Boolean) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -184,7 +186,7 @@ fun SettingsScreen(
                 }
 
                 if (!isPermissionsViewOpen) {
-                    // 🌟 MAIN SETTINGS VIEW: PERMISSIONS CARD + TELEMETRY VISIBILITY TOGGLE CARD
+                    // 🌟 MAIN SETTINGS VIEW: TELEMETRY TOGGLES + PERMISSIONS CARD
 
                     // Card 1: Telemetry Gauge Visibility Switch
                     Surface(
@@ -200,59 +202,92 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.surface,
                         shadowElevation = 4.dp
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = AutomotiveCyanAccent.copy(alpha = 0.18f),
-                                    modifier = Modifier.size(46.dp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Speed,
-                                            contentDescription = null,
-                                            tint = AutomotiveCyanAccent,
-                                            modifier = Modifier.size(24.dp)
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = AutomotiveCyanAccent.copy(alpha = 0.18f),
+                                        modifier = Modifier.size(46.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Speed,
+                                                contentDescription = null,
+                                                tint = AutomotiveCyanAccent,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Column {
+                                        Text(
+                                            text = "إظهار عدادات وقياسات السيارة 📊",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "عرض لوحة السرعة الحية، حرارة المحرك، جهد البطارية والـ RPM بالواجهة الرئيسية",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
 
-                                Column {
+                                Switch(
+                                    checked = isTelemetryVisible,
+                                    onCheckedChange = { onToggleTelemetryVisibility(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color(0xFF0F172A),
+                                        checkedTrackColor = AutomotiveCyanAccent
+                                    )
+                                )
+                            }
+
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "إظهار عدادات وقياسات السيارة 📊",
-                                        style = MaterialTheme.typography.titleMedium.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp
-                                        ),
+                                        text = "عرض العدادات على كافة الهواتف أيضاً 📱",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "عرض لوحة السرعة، الحرارة، جهة البطارية والـ RPM بالواجهة الرئيسية",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "افتراضياً تظهر العدادات تلقائياً على شاشات السيارات فقط",
+                                        style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                            }
 
-                            Switch(
-                                checked = isTelemetryVisible,
-                                onCheckedChange = { onToggleTelemetryVisibility(it) },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = Color(0xFF0F172A),
-                                    checkedTrackColor = AutomotiveCyanAccent
+                                Switch(
+                                    checked = showTelemetryOnAllDevices,
+                                    onCheckedChange = { onToggleShowTelemetryOnAllDevices(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color(0xFF0F172A),
+                                        checkedTrackColor = AutomotiveCyanAccent
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
 

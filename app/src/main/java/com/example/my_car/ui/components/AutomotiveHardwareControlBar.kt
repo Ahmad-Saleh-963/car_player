@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
-import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -93,25 +92,8 @@ object CarHardwareHelper {
             }
         }
 
-        // 2. System Hardware Backlight (Requires WRITE_SETTINGS on API 23+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (Settings.System.canWrite(context)) {
-                try {
-                    Settings.System.putInt(
-                        context.contentResolver,
-                        Settings.System.SCREEN_BRIGHTNESS_MODE,
-                        Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL
-                    )
-                    Settings.System.putInt(
-                        context.contentResolver,
-                        Settings.System.SCREEN_BRIGHTNESS,
-                        bInt
-                    )
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        } else {
+        // 2. System Hardware Backlight
+        if (Settings.System.canWrite(context)) {
             try {
                 Settings.System.putInt(
                     context.contentResolver,
@@ -179,7 +161,7 @@ fun AutomotiveHardwareControlBar(
                 Settings.System.SCREEN_BRIGHTNESS
             )
             (currentSysB / 255f).coerceIn(0.1f, 1.0f)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             0.75f
         }
         mutableFloatStateOf(initialB)
@@ -235,8 +217,8 @@ fun AutomotiveHardwareControlBar(
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -263,7 +245,10 @@ fun AutomotiveHardwareControlBar(
                     )
                 }
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -314,8 +299,8 @@ fun AutomotiveHardwareControlBar(
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
@@ -328,7 +313,10 @@ fun AutomotiveHardwareControlBar(
                         .padding(start = 2.dp)
                 )
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -366,10 +354,10 @@ fun AutomotiveHardwareControlBar(
     if (isVerticalLayout) {
         Column(
             modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            volumeCard(Modifier.fillMaxWidth())
-            brightnessCard(Modifier.fillMaxWidth())
+            volumeCard(Modifier.fillMaxWidth().weight(1f))
+            brightnessCard(Modifier.fillMaxWidth().weight(1f))
         }
     } else {
         Row(

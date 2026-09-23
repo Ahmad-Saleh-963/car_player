@@ -148,6 +148,9 @@ class MainActivity : ComponentActivity() {
                 var isTelemetryVisibleState by remember {
                     mutableStateOf(prefs.getBoolean("show_telemetry", true))
                 }
+                var showTelemetryOnAllDevicesState by remember {
+                    mutableStateOf(prefs.getBoolean("show_telemetry_all_devices", false))
+                }
 
                 // Intercept System Back Gesture/Button across all screens
                 BackHandler {
@@ -229,6 +232,7 @@ class MainActivity : ComponentActivity() {
                                         videoTracksCount = videoTracksState.size,
                                         favoritesCount = audioTracksState.count { it.isFavorite } + videoTracksState.count { it.isFavorite } + photoTracksState.count { it.isFavorite },
                                         isTelemetryVisible = isTelemetryVisibleState,
+                                        showTelemetryOnAllDevices = showTelemetryOnAllDevicesState,
                                         onDismissTelemetry = {
                                             isTelemetryVisibleState = false
                                             prefs.edit().putBoolean("show_telemetry", false).apply()
@@ -298,9 +302,14 @@ class MainActivity : ComponentActivity() {
                                         hasMediaPermission = hasPermissionState.value,
                                         onRequestMediaPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
                                         isTelemetryVisible = isTelemetryVisibleState,
+                                        showTelemetryOnAllDevices = showTelemetryOnAllDevicesState,
                                         onToggleTelemetryVisibility = { show ->
                                             isTelemetryVisibleState = show
                                             prefs.edit().putBoolean("show_telemetry", show).apply()
+                                        },
+                                        onToggleShowTelemetryOnAllDevices = { show ->
+                                            showTelemetryOnAllDevicesState = show
+                                            prefs.edit().putBoolean("show_telemetry_all_devices", show).apply()
                                         },
                                         onBack = { currentScreen.value = CarScreen.Dashboard },
                                         modifier = Modifier.padding(innerPadding)

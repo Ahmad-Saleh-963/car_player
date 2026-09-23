@@ -1,6 +1,10 @@
 package com.example.my_car.ui
 
 import android.annotation.SuppressLint
+import android.app.UiModeManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,6 +28,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -55,18 +61,37 @@ sealed class CarScreen {
     object Settings : CarScreen()
 }
 
+// 🚗 HELPER TO DETECT CAR HEAD UNITS (Fly Golden, TS10, FYT, Automotive OS)
+fun isCarHeadUnitDevice(context: Context): Boolean {
+    val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+    if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_CAR) {
+        return true
+    }
+    val config = context.resources.configuration
+    val isCarUi = (config.uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_CAR
+    val hasAutomotiveFeature = context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
+    return isCarUi || hasAutomotiveFeature
+}
+
 @Composable
 fun DashboardScreen(
     audioTracksCount: Int,
     videoTracksCount: Int,
     favoritesCount: Int,
     isTelemetryVisible: Boolean = true,
+    showTelemetryOnAllDevices: Boolean = false,
     onDismissTelemetry: () -> Unit = {},
     onNavigate: (CarScreen) -> Unit,
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
     var isPrayerBannerVisible by remember { mutableStateOf(true) }
+    var isEmergencyAlertDismissed by remember { mutableStateOf(false) }
+
+    // Check if running on a Car Head Unit or if forced in settings
+    val isCarUnit = remember(context) { isCarHeadUnitDevice(context) }
+    val shouldShowGauges = isTelemetryVisible && (isCarUnit || showTelemetryOnAllDevices)
 
     // Live Clock State
     var timeDigitsText by remember { mutableStateOf("12:00") }
@@ -75,6 +100,22 @@ fun DashboardScreen(
 
     // Live Real Vehicle Telemetry State
     val telemetry = VehicleTelemetryManager.telemetry
+
+    // 🚨 ACCURATE AUTOMOTIVE SAFETY DANGER & WARNING THRESHOLDS
+    val isTempDanger = telemetry.engineTempC != null && telemetry.engineTempC >= 100
+    val isTempWarning = telemetry.engineTempC != null && telemetry.engineTempC in 95..99
+
+    val isRpmDanger = telemetry.rpm != null && telemetry.rpm >= 5000
+    val isRpmWarning = telemetry.rpm != null && telemetry.rpm in 4000..4999
+
+    // 12V Car Battery Danger (< 11.2V or > 15.5V). Phone lithium batteries (3.7V - 4.3V) do NOT trigger car battery alert!
+    val isVoltDanger = telemetry.batteryVoltage != null && telemetry.batteryVoltage >= 8.0f && (telemetry.batteryVoltage !in 11.2f..15.5f)
+    val isVoltWarning = telemetry.batteryVoltage != null && telemetry.batteryVoltage >= 8.0f && (telemetry.batteryVoltage in 11.2f..11.8f || telemetry.batteryVoltage in 14.8f..15.4f)
+
+    val isSpeedDanger = telemetry.speedKmh != null && telemetry.speedKmh >= 140
+    val isSpeedWarning = telemetry.speedKmh != null && telemetry.speedKmh in 120..139
+
+    val hasAnyDanger = isTempDanger || isRpmDanger || isVoltDanger || isSpeedDanger
 
     // Ticking Clock Effect
     LaunchedEffect(Unit) {
@@ -145,7 +186,7 @@ fun DashboardScreen(
                                 maxLines = 1
                             )
                             Text(
-                                text = "اللوحة الرئيسية والعدادات المباشرة 🏎️",
+                                text = if (isCarUnit) "نظام الشاشة المجهزة للسيارة 🏎️" else "اللوحة الرئيسية والمشغل",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight,
                                 maxLines = 1
@@ -179,7 +220,6 @@ fun DashboardScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
 
-                                // Digital Clock Time Digits (hh:mm format)
                                 Text(
                                     text = timeDigitsText,
                                     style = MaterialTheme.typography.titleMedium.copy(
@@ -190,7 +230,6 @@ fun DashboardScreen(
                                     color = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight
                                 )
 
-                                // Compact AM/PM Badge
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
                                     color = if (isDark) AutomotiveCyanAccent.copy(alpha = 0.2f) else AutomotiveBluePrimaryLight.copy(alpha = 0.15f)
@@ -207,7 +246,6 @@ fun DashboardScreen(
                                 }
                             }
 
-                            // Sub-Row Compact Date
                             Text(
                                 text = currentDateText.ifEmpty { "التاريخ الحالي" },
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -218,8 +256,78 @@ fun DashboardScreen(
                     }
                 }
 
-                // 🏎️ 100% TRUTHFUL AUTOMOTIVE REAL TELEMETRY CARD WITH DISMISS (✕) BUTTON
-                if (isTelemetryVisible) {
+                // 🚨 SEPARATE DISMISSABLE EMERGENCY SAFETY BANNER (Only shows when in active danger!)
+                if (hasAnyDanger && !isEmergencyAlertDismissed) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFF2D0A0F),
+                        border = BorderStroke(1.5.dp, Color(0xFFFF1744)),
+                        shadowElevation = 6.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFFFF1744).copy(alpha = 0.25f),
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = "خطر",
+                                            tint = Color(0xFFFF1744),
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+
+                                Column {
+                                    Text(
+                                        text = "🚨 تنبيه أمان المركبة المباشر",
+                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = Color(0xFFFF1744)
+                                    )
+                                    Text(
+                                        text = when {
+                                            isTempDanger -> "⚠️ حرارة سائل التبريد مرتفعة جداً (${telemetry.engineTempC}°C). يرجى التوقف الآمن وفحص مياه الرادياتير والمروحة!"
+                                            isVoltDanger -> "⚠️ جهد بطارية السيارة منخفض (${String.format(Locale.US, "%.1f", telemetry.batteryVoltage)}V). يرجى فحص الدينامو والكهرباء لمنع توقف المحرك!"
+                                            isRpmDanger -> "⚠️ دوران المحرك مرتفع جداً (${telemetry.rpm} RPM). يرجى التبديل لغيار أعلى لتخفيف الضغط!"
+                                            else -> "⚠️ تم إكتشاف حالة تجاوز في سرعة السيارة (${telemetry.speedKmh} كم/س)!"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { isEmergencyAlertDismissed = true },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "إغلاق التنبيه",
+                                    tint = Color.White.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 🏎️ AUTOMOTIVE GAUGES CARD (SHOWS ON CAR HEAD UNITS OR IF ENABLED IN SETTINGS)
+                if (shouldShowGauges) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
@@ -258,7 +366,7 @@ fun DashboardScreen(
                                     modifier = Modifier.padding(start = 4.dp)
                                 )
 
-                                // Row 1: Speed + Engine RPM
+                                // Row 1: Speed + Engine RPM (Tachometer in x1000 RPM)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceAround,
@@ -271,48 +379,55 @@ fun DashboardScreen(
                                         icon = Icons.Default.Speed,
                                         accentColor = AutomotiveCyanAccent,
                                         isDark = isDark,
+                                        isDanger = isSpeedDanger,
+                                        isWarning = isSpeedWarning,
                                         modifier = Modifier.weight(1f)
                                     )
 
 
-
-                                    // 2. Engine RPM Gauge
+                                    // 2. Engine RPM Gauge (x1000 Tachometer style)
                                     GaugeItem(
                                         title = "دوران المحرك (RPM)",
-                                        valueText = if (telemetry.rpm != null && telemetry.rpm > 0) "${telemetry.rpm} RPM" else "غير مدعوم",
+                                        valueText = formatCarRpm(telemetry.rpm),
+                                        subBadge = if (telemetry.rpm != null && telemetry.rpm > 0) "x1000 RPM" else null,
                                         icon = Icons.Default.Sync,
                                         accentColor = Color(0xFF38BDF8),
                                         isDark = isDark,
+                                        isDanger = isRpmDanger,
+                                        isWarning = isRpmWarning,
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
 
                                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                                // Row 2: Coolant Temp + Battery Voltage
+                                // Row 2: Coolant Temp (Car Gauge Level: C / ¼ / ½ / ¾ / H) + Battery Voltage
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceAround,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // 3. Engine Temperature Gauge
+                                    // 3. Engine Temperature Gauge (Dial Status)
                                     GaugeItem(
                                         title = "حرارة المحرك",
-                                        valueText = if (telemetry.engineTempC != null && telemetry.engineTempC > -40) "${telemetry.engineTempC}°C" else "غير مدعوم",
+                                        valueText = formatCarTemp(telemetry.engineTempC),
                                         icon = Icons.Default.Thermostat,
                                         accentColor = Color(0xFFFFB300),
                                         isDark = isDark,
+                                        isDanger = isTempDanger,
+                                        isWarning = isTempWarning,
                                         modifier = Modifier.weight(1f)
                                     )
-
 
                                     // 4. Battery Voltage Gauge
                                     GaugeItem(
                                         title = "جهد البطارية",
-                                        valueText = if (telemetry.batteryVoltage != null && telemetry.batteryVoltage > 0f) "${String.format(Locale.US, "%.1f", telemetry.batteryVoltage)}V" else "غير مدعوم",
+                                        valueText = formatCarVoltage(telemetry.batteryVoltage),
                                         icon = Icons.Default.ElectricBolt,
                                         accentColor = Color(0xFF10B981),
                                         isDark = isDark,
+                                        isDanger = isVoltDanger,
+                                        isWarning = isVoltWarning,
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
@@ -438,6 +553,33 @@ fun DashboardScreen(
     }
 }
 
+// 🚗 HELPER FORMATTERS FOR STANDARD AUTOMOTIVE GAUGES
+fun formatCarRpm(rpm: Int?): String {
+    if (rpm == null || rpm <= 0) return "غير مدعوم"
+    val rpmInThousands = rpm / 1000f
+    return String.format(Locale.US, "%.1f", rpmInThousands)
+}
+
+fun formatCarTemp(tempC: Int?): String {
+    if (tempC == null || tempC < -40) return "غير مدعوم"
+    return when {
+        tempC < 60 -> "بارد C (${tempC}°C)"
+        tempC in 60..79 -> "ربع ¼ (${tempC}°C)"
+        tempC in 80..94 -> "نصف ½ (${tempC}°C)"
+        tempC in 95..99 -> "مرتفع ¾ (${tempC}°C)"
+        else -> "كامل H (${tempC}°C)"
+    }
+}
+
+fun formatCarVoltage(voltage: Float?): String {
+    if (voltage == null || voltage <= 0f) return "غير مدعوم"
+    return if (voltage < 8.0f) {
+        String.format(Locale.US, "%.1fV (هاتف)", voltage)
+    } else {
+        String.format(Locale.US, "%.1fV", voltage)
+    }
+}
+
 @Composable
 fun GaugeItem(
     title: String,
@@ -445,8 +587,17 @@ fun GaugeItem(
     icon: ImageVector,
     accentColor: Color,
     isDark: Boolean,
-    modifier: Modifier = Modifier
+    subBadge: String? = null,
+    isDanger: Boolean = false,
+    isWarning: Boolean = false,
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
+    val effectiveColor = when {
+        isDanger -> Color(0xFFFF1744)
+        isWarning -> Color(0xFFFF9100)
+        else -> accentColor
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -454,34 +605,76 @@ fun GaugeItem(
     ) {
         Surface(
             shape = RoundedCornerShape(10.dp),
-            color = accentColor.copy(alpha = 0.18f),
+            color = effectiveColor.copy(alpha = if (isDanger) 0.3f else 0.18f),
             modifier = Modifier.size(34.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = if (isDanger) Icons.Default.Warning else icon,
                     contentDescription = title,
-                    tint = accentColor,
+                    tint = effectiveColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
         }
 
         Column {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                color = if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight
-            )
-            Text(
-                text = valueText,
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = if (valueText.contains("غير مدعوم")) 12.sp else 15.sp,
-                    fontFamily = FontFamily.Monospace
-                ),
-                color = if (valueText.contains("غير مدعوم")) MaterialTheme.colorScheme.outline.copy(alpha = 0.7f) else accentColor
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    color = if (isDanger) Color(0xFFFF1744) else (if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight)
+                )
+
+                if (isDanger) {
+                    Text(
+                        text = "⚠️ خطر!",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        ),
+                        color = Color(0xFFFF1744)
+                    )
+                } else if (isWarning) {
+                    Text(
+                        text = "⚠️ تحذير",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        ),
+                        color = Color(0xFFFF9100)
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = valueText,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = if (valueText.contains("غير مدعوم")) 12.sp else 15.sp,
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    color = if (valueText.contains("غير مدعوم")) MaterialTheme.colorScheme.outline.copy(alpha = 0.7f) else effectiveColor
+                )
+
+                if (subBadge != null && !valueText.contains("غير مدعوم")) {
+                    Text(
+                        text = subBadge,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        ),
+                        color = effectiveColor.copy(alpha = 0.8f)
+                    )
+                }
+            }
         }
     }
 }
