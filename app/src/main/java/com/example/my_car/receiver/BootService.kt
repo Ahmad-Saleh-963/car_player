@@ -47,7 +47,19 @@ class BootService : Service() {
             .setAutoCancel(true)
             .build()
 
-        startForeground(2002, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(
+                    2002,
+                    notification,
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE
+                )
+            } else {
+                startForeground(2002, notification)
+            }
+        } else {
+            startForeground(2002, notification)
+        }
 
         stopSelf()
         return START_NOT_STICKY

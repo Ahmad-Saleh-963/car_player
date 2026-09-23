@@ -17,6 +17,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    androidResources {
+        localeFilters += listOf("en", "ar")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -34,6 +38,14 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "DebugProbesKt.bin"
+            excludes += "META-INF/*.kotlin_module"
+            excludes += "META-INF/version-control-info.textproto"
+        }
     }
 }
 

@@ -1,10 +1,9 @@
-# Optimize APK Size to < 5MB
+# Optimize APK Size
 -dontusemixedcaseclassnames
 -dontskipnonpubliclibraryclasses
 -dontpreverify
-
-# Keep App Classes
--keep class com.example.my_car.** { *; }
+-repackageclasses ''
+-allowaccessmodification
 
 # Suppress library warnings for R8
 -dontwarn androidx.media3.**

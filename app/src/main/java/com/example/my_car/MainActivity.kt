@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
@@ -523,9 +525,79 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private var audioManager: AudioManager? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
+
+    private fun requestAudioFocus(): Boolean {
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        val am = audioManager ?: return true
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest == null) {
+                audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build()
+                    )
+                    .setAcceptsDelayedFocusGain(true)
+                    .setOnAudioFocusChangeListener { focusChange ->
+                        when (focusChange) {
+                            AudioManager.AUDIOFOCUS_LOSS,
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                                pauseOrResumePlayback(forcePlay = false)
+                            }
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                                mediaPlayer?.setVolume(0.3f, 0.3f)
+                            }
+                            AudioManager.AUDIOFOCUS_GAIN -> {
+                                mediaPlayer?.setVolume(1.0f, 1.0f)
+                                pauseOrResumePlayback(forcePlay = true)
+                            }
+                        }
+                    }
+                    .build()
+            }
+            am.requestAudioFocus(audioFocusRequest!!) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(
+                { focusChange ->
+                    when (focusChange) {
+                        AudioManager.AUDIOFOCUS_LOSS,
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                            pauseOrResumePlayback(forcePlay = false)
+                        }
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                            mediaPlayer?.setVolume(0.3f, 0.3f)
+                        }
+                        AudioManager.AUDIOFOCUS_GAIN -> {
+                            mediaPlayer?.setVolume(1.0f, 1.0f)
+                            pauseOrResumePlayback(forcePlay = true)
+                        }
+                    }
+                },
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            ) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val am = audioManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(null)
+        }
+    }
+
     private fun playTrack(track: MediaTrack) {
         currentTrackState.value = track
         try {
+            requestAudioFocus()
             val serviceIntent = Intent(this, MyMusicService::class.java)
             ContextCompat.startForegroundService(this, serviceIntent)
 
@@ -653,6 +725,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        abandonAudioFocus()
         VehicleTelemetryManager.stopListening(this)
         try {
             unregisterReceiver(notificationActionReceiver)

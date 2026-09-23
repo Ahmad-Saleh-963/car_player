@@ -282,7 +282,15 @@ class MyMusicService : MediaBrowserServiceCompat() {
             notificationBuilder.setLargeIcon(artBitmap)
         }
 
-        startForeground(NOTIFICATION_ID, notificationBuilder.build())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(
+                NOTIFICATION_ID,
+                notificationBuilder.build(),
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            )
+        } else {
+            startForeground(NOTIFICATION_ID, notificationBuilder.build())
+        }
     }
 
     override fun onDestroy() {

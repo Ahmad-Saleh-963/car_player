@@ -109,7 +109,7 @@ object VehicleTelemetryManager {
                 context,
                 batteryReceiver,
                 batteryFilter,
-                ContextCompat.RECEIVER_NOT_EXPORTED
+                ContextCompat.RECEIVER_EXPORTED
             )
             if (stickyIntent != null) {
                 val voltageMv = stickyIntent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, -1)
@@ -162,7 +162,7 @@ object VehicleTelemetryManager {
                 context,
                 canBusReceiver,
                 canFilter,
-                ContextCompat.RECEIVER_NOT_EXPORTED
+                ContextCompat.RECEIVER_EXPORTED
             )
         } catch (e: Exception) {
             e.printStackTrace()
