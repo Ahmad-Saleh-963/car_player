@@ -14,6 +14,7 @@ import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -46,6 +47,7 @@ import com.example.my_car.ui.theme.My_carTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.core.content.edit
 
 class MainActivity : ComponentActivity() {
 
@@ -120,6 +122,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ⚡ GUARANTEED 100% ALWAYS KEEP SCREEN AWAKE (NEVER GO TO SLEEP/DIM)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
         enableEdgeToEdge()
 
         repository = MediaStoreRepository(this)
@@ -144,10 +150,16 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             My_carTheme {
+                // ⚡ GUARANTEED FOREGROUND SCREEN KEEP AWAKE
+                DisposableEffect(Unit) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    onDispose {}
+                }
+
                 val currentScreen = remember { mutableStateOf<CarScreen>(CarScreen.Dashboard) }
                 var showExitDialog by remember { mutableStateOf(false) }
 
-                val prefs = remember { getSharedPreferences("my_car_prefs", Context.MODE_PRIVATE) }
+                val prefs = remember { getSharedPreferences("my_car_prefs", MODE_PRIVATE) }
                 var isTelemetryVisibleState by remember {
                     mutableStateOf(prefs.getBoolean("show_telemetry", true))
                 }
@@ -177,7 +189,7 @@ class MainActivity : ComponentActivity() {
                         if (elapsedSec >= hudTimeoutSecState && !isHudActiveState) {
                             isHudActiveState = true
                         }
-                        delay(1000)
+                        delay(1000.milliseconds)
                     }
                 }
 
@@ -284,7 +296,7 @@ class MainActivity : ComponentActivity() {
                                             showTelemetryOnAllDevices = showTelemetryOnAllDevicesState,
                                             onDismissTelemetry = {
                                                 isTelemetryVisibleState = false
-                                                prefs.edit().putBoolean("show_telemetry", false).apply()
+                                                prefs.edit { putBoolean("show_telemetry", false)}
                                             },
                                             onNavigate = { screen -> currentScreen.value = screen },
                                             modifier = Modifier.padding(innerPadding)
@@ -356,19 +368,24 @@ class MainActivity : ComponentActivity() {
                                             hudTimeoutSec = hudTimeoutSecState,
                                             onToggleTelemetryVisibility = { show ->
                                                 isTelemetryVisibleState = show
-                                                prefs.edit().putBoolean("show_telemetry", show).apply()
+                                                prefs.edit { putBoolean("show_telemetry", show) }
                                             },
                                             onToggleShowTelemetryOnAllDevices = { show ->
                                                 showTelemetryOnAllDevicesState = show
-                                                prefs.edit().putBoolean("show_telemetry_all_devices", show).apply()
+                                                prefs.edit {
+                                                    putBoolean(
+                                                        "show_telemetry_all_devices",
+                                                        show
+                                                    )
+                                                }
                                             },
                                             onToggleHudEnabled = { enabled ->
                                                 isHudEnabledState = enabled
-                                                prefs.edit().putBoolean("hud_enabled", enabled).apply()
+                                                prefs.edit { putBoolean("hud_enabled", enabled) }
                                             },
                                             onChangeHudTimeoutSec = { timeout ->
                                                 hudTimeoutSecState = timeout
-                                                prefs.edit().putInt("hud_timeout", timeout).apply()
+                                                prefs.edit { putInt("hud_timeout", timeout) }
                                             },
                                             onBack = { currentScreen.value = CarScreen.Dashboard },
                                             modifier = Modifier.padding(innerPadding)
@@ -397,6 +414,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val coreGranted = hasCoreMediaPermission(this)
 
         if (coreGranted && !hasPermissionState.value) {

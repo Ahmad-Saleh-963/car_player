@@ -1,5 +1,6 @@
 package com.example.my_car.ui
 
+import android.annotation.SuppressLint
 import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -87,7 +88,7 @@ fun DashboardScreen(
     showTelemetryOnAllDevices: Boolean = false,
     onDismissTelemetry: () -> Unit = {},
     onNavigate: (CarScreen) -> Unit,
-    modifier: Modifier = Modifier
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -639,7 +640,7 @@ fun VisualArcGauge(
     subBadge: String? = null,
     isDanger: Boolean = false,
     isWarning: Boolean = false,
-    modifier: Modifier = Modifier
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     val effectiveColor = when {
         isDanger -> Color(0xFFFF1744)
