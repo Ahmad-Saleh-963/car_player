@@ -1,5 +1,6 @@
 package com.example.my_car.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,10 +16,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ElectricBolt
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.my_car.data.repository.VehicleTelemetryManager
 import com.example.my_car.ui.theme.*
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
@@ -54,8 +60,10 @@ fun DashboardScreen(
     audioTracksCount: Int,
     videoTracksCount: Int,
     favoritesCount: Int,
+    isTelemetryVisible: Boolean = true,
+    onDismissTelemetry: () -> Unit = {},
     onNavigate: (CarScreen) -> Unit,
-    modifier: Modifier = Modifier
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
     var isPrayerBannerVisible by remember { mutableStateOf(true) }
@@ -64,6 +72,9 @@ fun DashboardScreen(
     var timeDigitsText by remember { mutableStateOf("12:00") }
     var amPmText by remember { mutableStateOf("صباحاً") }
     var currentDateText by remember { mutableStateOf("") }
+
+    // Live Real Vehicle Telemetry State
+    val telemetry = VehicleTelemetryManager.telemetry
 
     // Ticking Clock Effect
     LaunchedEffect(Unit) {
@@ -98,7 +109,7 @@ fun DashboardScreen(
         ) {
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Header Bar with Compact Adaptive Clock & Settings Button
                 Row(
@@ -134,7 +145,7 @@ fun DashboardScreen(
                                 maxLines = 1
                             )
                             Text(
-                                text = "اللوحة الرئيسية للتحكم والملاحة",
+                                text = "اللوحة الرئيسية والعدادات المباشرة 🏎️",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight,
                                 maxLines = 1
@@ -203,6 +214,109 @@ fun DashboardScreen(
                                 color = if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight,
                                 maxLines = 1
                             )
+                        }
+                    }
+                }
+
+                // 🏎️ 100% TRUTHFUL AUTOMOTIVE REAL TELEMETRY CARD WITH DISMISS (✕) BUTTON
+                if (isTelemetryVisible) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isDark) Color(0xFF111827) else Color(0xFFF8FAFC),
+                        border = BorderStroke(1.dp, AutomotiveCyanAccent.copy(alpha = 0.6f)),
+                        shadowElevation = 4.dp
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            // Dismiss (✕) Button in Top Left Corner
+                            IconButton(
+                                onClick = onDismissTelemetry,
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(4.dp)
+                                    .size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "إخفاء العدادات",
+                                    tint = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // Title Header
+                                Text(
+                                    text = "عدادات وقياسات المركبة المباشرة 📊",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(start = 4.dp)
+                                )
+
+                                // Row 1: Speed + Engine RPM
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceAround,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // 1. Vehicle Speed Gauge
+                                    GaugeItem(
+                                        title = "السرعة المباشرة",
+                                        valueText = if (telemetry.speedKmh != null) "${telemetry.speedKmh} كم/س" else "غير مدعوم",
+                                        icon = Icons.Default.Speed,
+                                        accentColor = AutomotiveCyanAccent,
+                                        isDark = isDark,
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+
+
+                                    // 2. Engine RPM Gauge
+                                    GaugeItem(
+                                        title = "دوران المحرك (RPM)",
+                                        valueText = if (telemetry.rpm != null && telemetry.rpm > 0) "${telemetry.rpm} RPM" else "غير مدعوم",
+                                        icon = Icons.Default.Sync,
+                                        accentColor = Color(0xFF38BDF8),
+                                        isDark = isDark,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                                // Row 2: Coolant Temp + Battery Voltage
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceAround,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // 3. Engine Temperature Gauge
+                                    GaugeItem(
+                                        title = "حرارة المحرك",
+                                        valueText = if (telemetry.engineTempC != null && telemetry.engineTempC > -40) "${telemetry.engineTempC}°C" else "غير مدعوم",
+                                        icon = Icons.Default.Thermostat,
+                                        accentColor = Color(0xFFFFB300),
+                                        isDark = isDark,
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+
+                                    // 4. Battery Voltage Gauge
+                                    GaugeItem(
+                                        title = "جهد البطارية",
+                                        valueText = if (telemetry.batteryVoltage != null && telemetry.batteryVoltage > 0f) "${String.format(Locale.US, "%.1f", telemetry.batteryVoltage)}V" else "غير مدعوم",
+                                        icon = Icons.Default.ElectricBolt,
+                                        accentColor = Color(0xFF10B981),
+                                        isDark = isDark,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -320,6 +434,54 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun GaugeItem(
+    title: String,
+    valueText: String,
+    icon: ImageVector,
+    accentColor: Color,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+    ) {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = accentColor.copy(alpha = 0.18f),
+            modifier = Modifier.size(34.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = accentColor,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight
+            )
+            Text(
+                text = valueText,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = if (valueText.contains("غير مدعوم")) 12.sp else 15.sp,
+                    fontFamily = FontFamily.Monospace
+                ),
+                color = if (valueText.contains("غير مدعوم")) MaterialTheme.colorScheme.outline.copy(alpha = 0.7f) else accentColor
+            )
         }
     }
 }

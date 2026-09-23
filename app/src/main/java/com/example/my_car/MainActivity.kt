@@ -35,6 +35,7 @@ import androidx.lifecycle.lifecycleScope
 import com.example.my_car.data.model.MediaTrack
 import com.example.my_car.data.repository.MediaIndexCache
 import com.example.my_car.data.repository.MediaStoreRepository
+import com.example.my_car.data.repository.VehicleTelemetryManager
 import com.example.my_car.service.MyMusicService
 import com.example.my_car.ui.*
 import com.example.my_car.ui.components.AutomotiveGestureFrame
@@ -79,12 +80,13 @@ class MainActivity : ComponentActivity() {
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions.values.all { it }
-        hasPermissionState.value = granted
-        if (granted) {
+    ) { _ ->
+        val coreGranted = hasCoreMediaPermission(this)
+        hasPermissionState.value = coreGranted
+        if (coreGranted) {
             loadMediaFiles()
-            Toast.makeText(this, "تم منح الصلاحيات بنجاح! 🚗", Toast.LENGTH_SHORT).show()
+            VehicleTelemetryManager.startListening(this)
+            Toast.makeText(this, "تم منح الصلاحية بنجاح! 🚗", Toast.LENGTH_SHORT).show()
         } else {
             Toast.makeText(this, "تم رفض الصلاحية. اضغط مجدداً للانتقال للإعدادات لتمكينها يدوياً.", Toast.LENGTH_LONG).show()
         }
@@ -135,11 +137,17 @@ class MainActivity : ComponentActivity() {
         ContextCompat.registerReceiver(this, notificationActionReceiver, intentFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         checkPermissions(autoLaunchSystemSettingsIfDenied = false)
+        VehicleTelemetryManager.startListening(this)
 
         setContent {
             My_carTheme {
                 val currentScreen = remember { mutableStateOf<CarScreen>(CarScreen.Dashboard) }
                 var showExitDialog by remember { mutableStateOf(false) }
+
+                val prefs = remember { getSharedPreferences("my_car_prefs", Context.MODE_PRIVATE) }
+                var isTelemetryVisibleState by remember {
+                    mutableStateOf(prefs.getBoolean("show_telemetry", true))
+                }
 
                 // Intercept System Back Gesture/Button across all screens
                 BackHandler {
@@ -220,6 +228,11 @@ class MainActivity : ComponentActivity() {
                                         audioTracksCount = audioTracksState.size,
                                         videoTracksCount = videoTracksState.size,
                                         favoritesCount = audioTracksState.count { it.isFavorite } + videoTracksState.count { it.isFavorite } + photoTracksState.count { it.isFavorite },
+                                        isTelemetryVisible = isTelemetryVisibleState,
+                                        onDismissTelemetry = {
+                                            isTelemetryVisibleState = false
+                                            prefs.edit().putBoolean("show_telemetry", false).apply()
+                                        },
                                         onNavigate = { screen -> currentScreen.value = screen },
                                         modifier = Modifier.padding(innerPadding)
                                     )
@@ -284,6 +297,11 @@ class MainActivity : ComponentActivity() {
                                     SettingsScreen(
                                         hasMediaPermission = hasPermissionState.value,
                                         onRequestMediaPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
+                                        isTelemetryVisible = isTelemetryVisibleState,
+                                        onToggleTelemetryVisibility = { show ->
+                                            isTelemetryVisibleState = show
+                                            prefs.edit().putBoolean("show_telemetry", show).apply()
+                                        },
                                         onBack = { currentScreen.value = CarScreen.Dashboard },
                                         modifier = Modifier.padding(innerPadding)
                                     )
@@ -298,20 +316,30 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Silent check on return from System Settings
-        val permissions = getRequiredPermissions()
-        val allGranted = permissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
+        val coreGranted = hasCoreMediaPermission(this)
 
-        if (allGranted && !hasPermissionState.value) {
+        if (coreGranted && !hasPermissionState.value) {
             hasPermissionState.value = true
             loadMediaFiles()
+        }
+        VehicleTelemetryManager.startListening(this)
+    }
+
+    private fun hasCoreMediaPermission(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         }
     }
 
     private fun getRequiredPermissions(): List<String> {
         val permissions = mutableListOf<String>()
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
             permissions.add(Manifest.permission.READ_MEDIA_VIDEO)
@@ -324,24 +352,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkPermissions(autoLaunchSystemSettingsIfDenied: Boolean = false) {
-        val permissions = getRequiredPermissions()
-        val allGranted = permissions.all {
-            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
-        }
+        val coreGranted = hasCoreMediaPermission(this)
 
-        hasPermissionState.value = allGranted
-        if (allGranted) {
+        hasPermissionState.value = coreGranted
+        if (coreGranted) {
             loadMediaFiles()
             return
         }
 
         if (autoLaunchSystemSettingsIfDenied) {
+            val permissions = getRequiredPermissions()
             val shouldShowRationale = permissions.any {
                 ActivityCompat.shouldShowRequestPermissionRationale(this, it)
             }
 
             if (hasAttemptedPermissionRequest && !shouldShowRationale) {
-                // Denied or "Don't Ask Again" checked -> Directly open System App Settings
                 openAppSettings(this)
                 return
             }
@@ -529,6 +554,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        VehicleTelemetryManager.stopListening(this)
         try {
             unregisterReceiver(notificationActionReceiver)
         } catch (e: Exception) {

@@ -1,11 +1,11 @@
 package com.example.my_car.ui
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -53,11 +54,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.my_car.receiver.BootReceiver
 import com.example.my_car.ui.theme.*
+import androidx.core.net.toUri
 
+@SuppressLint("UseKtx")
 @Composable
 fun SettingsScreen(
     hasMediaPermission: Boolean,
     onRequestMediaPermission: () -> Unit,
+    isTelemetryVisible: Boolean = true,
+    onToggleTelemetryVisibility: (Boolean) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -65,7 +70,7 @@ fun SettingsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val isDark = isSystemInDarkTheme()
 
-    // 🚀 SINGLE SUB-SCREEN STATE: Default = false (Displays ONLY ONE Option: "إدارة الصلاحيات")
+    // 🚀 SINGLE SUB-SCREEN STATE: Default = false (Displays Main Settings Options)
     var isPermissionsViewOpen by remember { mutableStateOf(false) }
 
     // Dynamic Live Permission Status States
@@ -179,7 +184,79 @@ fun SettingsScreen(
                 }
 
                 if (!isPermissionsViewOpen) {
-                    // 🌟 INITIAL VIEW: ONLY ONE SINGLE OPTION ("إدارة الصلاحيات")
+                    // 🌟 MAIN SETTINGS VIEW: PERMISSIONS CARD + TELEMETRY VISIBILITY TOGGLE CARD
+
+                    // Card 1: Telemetry Gauge Visibility Switch
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .border(
+                                width = 1.dp,
+                                color = AutomotiveCyanAccent.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(20.dp)
+                            ),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = AutomotiveCyanAccent.copy(alpha = 0.18f),
+                                    modifier = Modifier.size(46.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Speed,
+                                            contentDescription = null,
+                                            tint = AutomotiveCyanAccent,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                    }
+                                }
+
+                                Column {
+                                    Text(
+                                        text = "إظهار عدادات وقياسات السيارة 📊",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "عرض لوحة السرعة، الحرارة، جهة البطارية والـ RPM بالواجهة الرئيسية",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Switch(
+                                checked = isTelemetryVisible,
+                                onCheckedChange = { onToggleTelemetryVisibility(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color(0xFF0F172A),
+                                    checkedTrackColor = AutomotiveCyanAccent
+                                )
+                            )
+                        }
+                    }
+
+                    // Card 2: Permissions Manager Entry Option
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -360,7 +437,7 @@ fun SettingsScreen(
                                         try {
                                             val intent = Intent(
                                                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                                Uri.parse("package:${context.packageName}")
+                                                "package:${context.packageName}".toUri()
                                             )
                                             context.startActivity(intent)
                                         } catch (e: Exception) {
@@ -574,7 +651,7 @@ fun checkAutoStartPermission(context: Context): Boolean {
 fun openWriteSettings(context: Context) {
     try {
         val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
-            data = Uri.parse("package:${context.packageName}")
+            data = "package:${context.packageName}".toUri()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
@@ -588,7 +665,7 @@ fun openAppSettings(context: Context) {
     try {
         Toast.makeText(context, "تم توجيهك لإعدادات التطبيق للتحكم بالصلاحيات", Toast.LENGTH_SHORT).show()
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.parse("package:${context.packageName}")
+            data = "package:${context.packageName}".toUri()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(intent)
@@ -604,7 +681,7 @@ fun openAutoStartSettings(context: Context) {
         if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(context.packageName)) {
             try {
                 val batteryIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(batteryIntent)
