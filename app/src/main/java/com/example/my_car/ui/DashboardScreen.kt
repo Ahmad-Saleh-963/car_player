@@ -1,6 +1,5 @@
 package com.example.my_car.ui
 
-import android.annotation.SuppressLint
 import android.app.UiModeManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -9,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,8 +34,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -50,6 +53,8 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
 
 sealed class CarScreen {
@@ -82,7 +87,7 @@ fun DashboardScreen(
     showTelemetryOnAllDevices: Boolean = false,
     onDismissTelemetry: () -> Unit = {},
     onNavigate: (CarScreen) -> Unit,
-    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -109,7 +114,7 @@ fun DashboardScreen(
     val isRpmWarning = telemetry.rpm != null && telemetry.rpm in 4000..4999
 
     // 12V Car Battery Danger (< 11.2V or > 15.5V). Phone lithium batteries (3.7V - 4.3V) do NOT trigger car battery alert!
-    val isVoltDanger = telemetry.batteryVoltage != null && telemetry.batteryVoltage >= 8.0f && (telemetry.batteryVoltage !in 11.2f..15.5f)
+    val isVoltDanger = telemetry.batteryVoltage != null && telemetry.batteryVoltage >= 8.0f && (telemetry.batteryVoltage < 11.2f || telemetry.batteryVoltage > 15.5f)
     val isVoltWarning = telemetry.batteryVoltage != null && telemetry.batteryVoltage >= 8.0f && (telemetry.batteryVoltage in 11.2f..11.8f || telemetry.batteryVoltage in 14.8f..15.4f)
 
     val isSpeedDanger = telemetry.speedKmh != null && telemetry.speedKmh >= 140
@@ -122,7 +127,7 @@ fun DashboardScreen(
         val arLocale = Locale.forLanguageTag("ar")
         val timeFormat = SimpleDateFormat("hh:mm", arLocale)
         val amPmFormat = SimpleDateFormat("a", arLocale)
-        val dateFormat = SimpleDateFormat("EEEE، d MMMM", arLocale)
+        val dateFormat = SimpleDateFormat("EEEE، d MMMM yyyy", arLocale)
 
         while (true) {
             val now = Date()
@@ -152,7 +157,7 @@ fun DashboardScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // Header Bar with Compact Adaptive Clock & Settings Button
+                // Header Bar with Adaptive Clock & Settings Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -194,66 +199,13 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Compact Adaptive Digital Automotive Clock Card
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = if (isDark) Color(0xFF131C2E) else Color(0xFFE2E8F0),
-                        border = BorderStroke(
-                            1.dp,
-                            if (isDark) AutomotiveCyanAccent.copy(alpha = 0.7f) else AutomotiveBluePrimaryLight.copy(alpha = 0.4f)
-                        ),
-                        shadowElevation = 4.dp
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(1.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AccessTime,
-                                    contentDescription = "الوقت",
-                                    tint = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
-                                    modifier = Modifier.size(16.dp)
-                                )
-
-                                Text(
-                                    text = timeDigitsText,
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        fontSize = 16.sp,
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    color = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight
-                                )
-
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = if (isDark) AutomotiveCyanAccent.copy(alpha = 0.2f) else AutomotiveBluePrimaryLight.copy(alpha = 0.15f)
-                                ) {
-                                    Text(
-                                        text = amPmText,
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 10.sp
-                                        ),
-                                        color = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight,
-                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-
-                            Text(
-                                text = currentDateText.ifEmpty { "التاريخ الحالي" },
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight,
-                                maxLines = 1
-                            )
-                        }
-                    }
+                    // 🕒 LUXURIOUS HIGH-CONTRAST AUTOMOTIVE DASHBOARD CLOCK CARD
+                    AutomotiveDashboardClockCard(
+                        timeDigitsText = timeDigitsText,
+                        amPmText = amPmText,
+                        currentDateText = currentDateText,
+                        isDark = isDark
+                    )
                 }
 
                 // 🚨 SEPARATE DISMISSABLE EMERGENCY SAFETY BANNER (Only shows when in active danger!)
@@ -326,7 +278,7 @@ fun DashboardScreen(
                     }
                 }
 
-                // 🏎️ AUTOMOTIVE GAUGES CARD (SHOWS ON CAR HEAD UNITS OR IF ENABLED IN SETTINGS)
+                // 🏎️ AUTOMOTIVE VISUAL ARC GAUGES CARD (SHOWS ON CAR HEAD UNITS OR IF ENABLED IN SETTINGS)
                 if (shouldShowGauges) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -366,16 +318,17 @@ fun DashboardScreen(
                                     modifier = Modifier.padding(start = 4.dp)
                                 )
 
-                                // Row 1: Speed + Engine RPM (Tachometer in x1000 RPM)
+                                // Row 1: Speed + Engine RPM Visual Arc Gauges
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceAround,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // 1. Vehicle Speed Gauge
-                                    GaugeItem(
+                                    // 1. Vehicle Speed Visual Arc Gauge
+                                    VisualArcGauge(
                                         title = "السرعة المباشرة",
                                         valueText = if (telemetry.speedKmh != null) "${telemetry.speedKmh} كم/س" else "غير مدعوم",
+                                        progressFraction = (telemetry.speedKmh ?: 0) / 220f,
                                         icon = Icons.Default.Speed,
                                         accentColor = AutomotiveCyanAccent,
                                         isDark = isDark,
@@ -385,10 +338,11 @@ fun DashboardScreen(
                                     )
 
 
-                                    // 2. Engine RPM Gauge (x1000 Tachometer style)
-                                    GaugeItem(
+                                    // 2. Engine RPM Visual Arc Gauge (x1000 Tachometer style)
+                                    VisualArcGauge(
                                         title = "دوران المحرك (RPM)",
                                         valueText = formatCarRpm(telemetry.rpm),
+                                        progressFraction = (telemetry.rpm ?: 0) / 8000f,
                                         subBadge = if (telemetry.rpm != null && telemetry.rpm > 0) "x1000 RPM" else null,
                                         icon = Icons.Default.Sync,
                                         accentColor = Color(0xFF38BDF8),
@@ -407,10 +361,12 @@ fun DashboardScreen(
                                     horizontalArrangement = Arrangement.SpaceAround,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // 3. Engine Temperature Gauge (Dial Status)
-                                    GaugeItem(
+                                    // 3. Engine Temperature Visual Arc Gauge
+                                    val tempFraction = ((telemetry.engineTempC ?: 40) - 40) / 80f
+                                    VisualArcGauge(
                                         title = "حرارة المحرك",
                                         valueText = formatCarTemp(telemetry.engineTempC),
+                                        progressFraction = tempFraction,
                                         icon = Icons.Default.Thermostat,
                                         accentColor = Color(0xFFFFB300),
                                         isDark = isDark,
@@ -419,10 +375,12 @@ fun DashboardScreen(
                                         modifier = Modifier.weight(1f)
                                     )
 
-                                    // 4. Battery Voltage Gauge
-                                    GaugeItem(
+                                    // 4. Battery Voltage Visual Arc Gauge
+                                    val voltFraction = ((telemetry.batteryVoltage ?: 10f) - 10f) / 6f
+                                    VisualArcGauge(
                                         title = "جهد البطارية",
                                         valueText = formatCarVoltage(telemetry.batteryVoltage),
+                                        progressFraction = voltFraction,
                                         icon = Icons.Default.ElectricBolt,
                                         accentColor = Color(0xFF10B981),
                                         isDark = isDark,
@@ -553,6 +511,95 @@ fun DashboardScreen(
     }
 }
 
+// 🕒 LUXURIOUS AUTOMOTIVE DASHBOARD CLOCK CARD
+@Composable
+fun AutomotiveDashboardClockCard(
+    timeDigitsText: String,
+    amPmText: String,
+    currentDateText: String,
+    isDark: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val accentColor = if (isDark) AutomotiveCyanAccent else AutomotiveBluePrimaryLight
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = if (isDark) Color(0xFF0F172A) else Color(0xFFF1F5F9),
+        border = BorderStroke(
+            1.5.dp,
+            accentColor.copy(alpha = 0.75f)
+        ),
+        shadowElevation = 5.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = accentColor.copy(alpha = 0.18f),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.AccessTime,
+                        contentDescription = "الساعة",
+                        tint = accentColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Column(
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = timeDigitsText,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 17.sp,
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = accentColor.copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = amPmText,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
+                            color = accentColor,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = currentDateText.ifEmpty { "التاريخ الحالي" },
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 11.sp
+                    ),
+                    color = if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
 // 🚗 HELPER FORMATTERS FOR STANDARD AUTOMOTIVE GAUGES
 fun formatCarRpm(rpm: Int?): String {
     if (rpm == null || rpm <= 0) return "غير مدعوم"
@@ -580,17 +627,19 @@ fun formatCarVoltage(voltage: Float?): String {
     }
 }
 
+// 🏎️ VISUAL CIRCULAR SWEEPING ARC GAUGE COMPONENT (THEME COLOR NEEDLE POINTER + ACTIVE FILL)
 @Composable
-fun GaugeItem(
+fun VisualArcGauge(
     title: String,
     valueText: String,
+    progressFraction: Float,
     icon: ImageVector,
     accentColor: Color,
     isDark: Boolean,
     subBadge: String? = null,
     isDanger: Boolean = false,
     isWarning: Boolean = false,
-    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
+    modifier: Modifier = Modifier
 ) {
     val effectiveColor = when {
         isDanger -> Color(0xFFFF1744)
@@ -600,32 +649,101 @@ fun GaugeItem(
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
     ) {
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = effectiveColor.copy(alpha = if (isDanger) 0.3f else 0.18f),
-            modifier = Modifier.size(34.dp)
+        // 1. Custom Canvas Sweeping Dial Arc Gauge (240° Arc + Pointer Needle in Theme Color)
+        Box(
+            modifier = Modifier.size(56.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = if (isDanger) Icons.Default.Warning else icon,
-                    contentDescription = title,
-                    tint = effectiveColor,
-                    modifier = Modifier.size(20.dp)
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val center = Offset(w / 2f, h / 2f)
+                val strokePx = 4.5.dp.toPx()
+                val radius = (w.coerceAtMost(h) / 2f) - strokePx
+
+                // 240 Degree Sweeping Arc starting from 150° (7 o'clock to 5 o'clock)
+                val startAngle = 150f
+                val totalSweep = 240f
+                val safeFraction = if (valueText.contains("غير مدعوم")) 0f else progressFraction.coerceIn(0f, 1f)
+                val activeSweep = safeFraction * totalSweep
+
+                // Background Track Arc
+                drawArc(
+                    color = effectiveColor.copy(alpha = 0.20f),
+                    startAngle = startAngle,
+                    sweepAngle = totalSweep,
+                    useCenter = false,
+                    style = Stroke(width = strokePx, cap = StrokeCap.Round)
+                )
+
+                // Active Progress Fill Arc
+                if (safeFraction > 0f) {
+                    drawArc(
+                        color = effectiveColor,
+                        startAngle = startAngle,
+                        sweepAngle = activeSweep,
+                        useCenter = false,
+                        style = Stroke(width = strokePx + 1.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+
+                // Needle Pointer Line (Colored distinctly with Theme Color!)
+                val needleAngleDeg = startAngle + activeSweep
+                val needleAngleRad = Math.toRadians(needleAngleDeg.toDouble())
+                val needleLength = radius * 0.78f
+
+                val needleX = center.x + needleLength * cos(needleAngleRad).toFloat()
+                val needleY = center.y + needleLength * sin(needleAngleRad).toFloat()
+
+                // Draw Vibrant Needle in Theme Color
+                drawLine(
+                    color = effectiveColor,
+                    start = center,
+                    end = Offset(needleX, needleY),
+                    strokeWidth = 2.5.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+
+                // Center Pin Cap Head
+                drawCircle(
+                    color = effectiveColor,
+                    radius = 3.5.dp.toPx(),
+                    center = center
+                )
+                drawCircle(
+                    color = Color.White,
+                    radius = 1.5.dp.toPx(),
+                    center = center
                 )
             }
+
+            // Small Center Icon Inside the Arc
+            Icon(
+                imageVector = if (isDanger) Icons.Default.Warning else icon,
+                contentDescription = title,
+                tint = effectiveColor,
+                modifier = Modifier
+                    .size(16.dp)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 2.dp)
+            )
         }
 
-        Column {
+        // 2. Value Text + Title Column
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
                     color = if (isDanger) Color(0xFFFF1744) else (if (isDark) AutomotiveTextSecondaryDark else AutomotiveTextSecondaryLight)
                 )
 
@@ -671,7 +789,7 @@ fun GaugeItem(
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.sp
                         ),
-                        color = effectiveColor.copy(alpha = 0.8f)
+                        color = effectiveColor.copy(alpha = 0.85f)
                     )
                 }
             }
