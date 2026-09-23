@@ -1,5 +1,6 @@
 package com.example.my_car.ui
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -81,7 +82,7 @@ fun AudioPlayerScreen(
     onToggleShuffle: () -> Unit,
     onToggleRepeat: () -> Unit,
     onToggleFavorite: (MediaTrack) -> Unit,
-    modifier: Modifier = Modifier
+    @SuppressLint("ModifierParameter") modifier: Modifier = Modifier
 ) {
     val isDark = isSystemInDarkTheme()
     var searchQuery by remember { mutableStateOf("") }
