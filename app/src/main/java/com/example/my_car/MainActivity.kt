@@ -20,6 +20,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +28,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -39,6 +41,7 @@ import com.example.my_car.data.repository.VehicleTelemetryManager
 import com.example.my_car.service.MyMusicService
 import com.example.my_car.ui.*
 import com.example.my_car.ui.components.AutomotiveGestureFrame
+import com.example.my_car.ui.components.HudScreenSaverOverlay
 import com.example.my_car.ui.theme.My_carTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -152,9 +155,38 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(prefs.getBoolean("show_telemetry_all_devices", false))
                 }
 
+                // 🌙 HUD ScreenSaver Settings & Inactivity Timer
+                var isHudEnabledState by remember {
+                    mutableStateOf(prefs.getBoolean("hud_enabled", true))
+                }
+                var hudTimeoutSecState by remember {
+                    mutableIntStateOf(prefs.getInt("hud_timeout", 10))
+                }
+
+                var lastInteractionTimeMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+                var isHudActiveState by remember { mutableStateOf(false) }
+
+                // Inactivity Timer Loop for HUD ScreenSaver
+                LaunchedEffect(isHudEnabledState, hudTimeoutSecState, isHudActiveState, lastInteractionTimeMs) {
+                    if (!isHudEnabledState) {
+                        isHudActiveState = false
+                        return@LaunchedEffect
+                    }
+                    while (true) {
+                        val elapsedSec = (System.currentTimeMillis() - lastInteractionTimeMs) / 1000
+                        if (elapsedSec >= hudTimeoutSecState && !isHudActiveState) {
+                            isHudActiveState = true
+                        }
+                        delay(1000)
+                    }
+                }
+
                 // Intercept System Back Gesture/Button across all screens
                 BackHandler {
-                    if (currentScreen.value != CarScreen.Dashboard) {
+                    if (isHudActiveState) {
+                        isHudActiveState = false
+                        lastInteractionTimeMs = System.currentTimeMillis()
+                    } else if (currentScreen.value != CarScreen.Dashboard) {
                         currentScreen.value = CarScreen.Dashboard
                     } else {
                         showExitDialog = true
@@ -216,107 +248,147 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                AutomotiveGestureFrame(isPlaying = isPlayingState.value) {
-                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                        if (!hasPermissionState.value) {
-                            PermissionScreen(
-                                onRequestPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
-                                onOpenSettings = { openAppSettings(this@MainActivity) },
-                                modifier = Modifier.padding(innerPadding)
-                            )
-                        } else {
-                            when (currentScreen.value) {
-                                CarScreen.Dashboard -> {
-                                    DashboardScreen(
-                                        audioTracksCount = audioTracksState.size,
-                                        videoTracksCount = videoTracksState.size,
-                                        favoritesCount = audioTracksState.count { it.isFavorite } + videoTracksState.count { it.isFavorite } + photoTracksState.count { it.isFavorite },
-                                        isTelemetryVisible = isTelemetryVisibleState,
-                                        showTelemetryOnAllDevices = showTelemetryOnAllDevicesState,
-                                        onDismissTelemetry = {
-                                            isTelemetryVisibleState = false
-                                            prefs.edit().putBoolean("show_telemetry", false).apply()
-                                        },
-                                        onNavigate = { screen -> currentScreen.value = screen },
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
-                                }
-
-                                CarScreen.Audio -> {
-                                    AudioPlayerScreen(
-                                        tracks = audioTracksState,
-                                        favoriteVersion = favoriteVersionState.intValue,
-                                        currentTrack = currentTrackState.value,
-                                        isPlaying = isPlayingState.value,
-                                        currentPositionMs = currentPositionMsState.longValue,
-                                        durationMs = durationMsState.longValue,
-                                        isShuffle = isShuffleState.value,
-                                        isRepeatOne = isRepeatOneState.value,
-                                        onBack = { currentScreen.value = CarScreen.Dashboard },
-                                        onTrackSelect = { track -> playTrack(track) },
-                                        onPlayPauseClick = { togglePlayPause() },
-                                        onNextClick = { playNextTrack() },
-                                        onPrevClick = { playPrevTrack() },
-                                        onSeekTo = { pos -> seekToPosition(pos) },
-                                        onToggleShuffle = { isShuffleState.value = !isShuffleState.value },
-                                        onToggleRepeat = { isRepeatOneState.value = !isRepeatOneState.value },
-                                        onToggleFavorite = { track -> toggleFavorite(track) },
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
-                                }
-
-                                CarScreen.Video -> {
-                                    VideoPlayerScreen(
-                                        videos = videoTracksState,
-                                        photos = photoTracksState,
-                                        hasPhotoPermission = checkPhotoPermission(this@MainActivity),
-                                        onRequestPhotoPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
-                                        onBack = { currentScreen.value = CarScreen.Dashboard },
-                                        onToggleFavorite = { track -> toggleFavorite(track) },
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
-                                }
-
-                                CarScreen.Folders -> {
-                                    FoldersScreen(
-                                        tracks = audioTracksState,
-                                        onBack = { currentScreen.value = CarScreen.Dashboard },
-                                        onTrackSelect = { track -> playTrack(track) },
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
-                                }
-
-                                CarScreen.Favorites -> {
-                                    FavoritesScreen(
-                                        tracks = audioTracksState + videoTracksState + photoTracksState,
-                                        favoriteVersion = favoriteVersionState.intValue,
-                                        onBack = { currentScreen.value = CarScreen.Dashboard },
-                                        onTrackSelect = { track -> playTrack(track) },
-                                        onToggleFavorite = { track -> toggleFavorite(track) },
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
-                                }
-
-                                CarScreen.Settings -> {
-                                    SettingsScreen(
-                                        hasMediaPermission = hasPermissionState.value,
-                                        onRequestMediaPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
-                                        isTelemetryVisible = isTelemetryVisibleState,
-                                        showTelemetryOnAllDevices = showTelemetryOnAllDevicesState,
-                                        onToggleTelemetryVisibility = { show ->
-                                            isTelemetryVisibleState = show
-                                            prefs.edit().putBoolean("show_telemetry", show).apply()
-                                        },
-                                        onToggleShowTelemetryOnAllDevices = { show ->
-                                            showTelemetryOnAllDevicesState = show
-                                            prefs.edit().putBoolean("show_telemetry_all_devices", show).apply()
-                                        },
-                                        onBack = { currentScreen.value = CarScreen.Dashboard },
-                                        modifier = Modifier.padding(innerPadding)
-                                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.changes.any { it.pressed }) {
+                                        lastInteractionTimeMs = System.currentTimeMillis()
+                                        if (isHudActiveState) {
+                                            isHudActiveState = false
+                                        }
+                                    }
                                 }
                             }
                         }
+                ) {
+                    AutomotiveGestureFrame(isPlaying = isPlayingState.value) {
+                        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                            if (!hasPermissionState.value) {
+                                PermissionScreen(
+                                    onRequestPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
+                                    onOpenSettings = { openAppSettings(this@MainActivity) },
+                                    modifier = Modifier.padding(innerPadding)
+                                )
+                            } else {
+                                when (currentScreen.value) {
+                                    CarScreen.Dashboard -> {
+                                        DashboardScreen(
+                                            audioTracksCount = audioTracksState.size,
+                                            videoTracksCount = videoTracksState.size,
+                                            favoritesCount = audioTracksState.count { it.isFavorite } + videoTracksState.count { it.isFavorite } + photoTracksState.count { it.isFavorite },
+                                            isTelemetryVisible = isTelemetryVisibleState,
+                                            showTelemetryOnAllDevices = showTelemetryOnAllDevicesState,
+                                            onDismissTelemetry = {
+                                                isTelemetryVisibleState = false
+                                                prefs.edit().putBoolean("show_telemetry", false).apply()
+                                            },
+                                            onNavigate = { screen -> currentScreen.value = screen },
+                                            modifier = Modifier.padding(innerPadding)
+                                        )
+                                    }
+
+                                    CarScreen.Audio -> {
+                                        AudioPlayerScreen(
+                                            tracks = audioTracksState,
+                                            favoriteVersion = favoriteVersionState.intValue,
+                                            currentTrack = currentTrackState.value,
+                                            isPlaying = isPlayingState.value,
+                                            currentPositionMs = currentPositionMsState.longValue,
+                                            durationMs = durationMsState.longValue,
+                                            isShuffle = isShuffleState.value,
+                                            isRepeatOne = isRepeatOneState.value,
+                                            onBack = { currentScreen.value = CarScreen.Dashboard },
+                                            onTrackSelect = { track -> playTrack(track) },
+                                            onPlayPauseClick = { togglePlayPause() },
+                                            onNextClick = { playNextTrack() },
+                                            onPrevClick = { playPrevTrack() },
+                                            onSeekTo = { pos -> seekToPosition(pos) },
+                                            onToggleShuffle = { isShuffleState.value = !isShuffleState.value },
+                                            onToggleRepeat = { isRepeatOneState.value = !isRepeatOneState.value },
+                                            onToggleFavorite = { track -> toggleFavorite(track) },
+                                            modifier = Modifier.padding(innerPadding)
+                                        )
+                                    }
+
+                                    CarScreen.Video -> {
+                                        VideoPlayerScreen(
+                                            videos = videoTracksState,
+                                            photos = photoTracksState,
+                                            hasPhotoPermission = checkPhotoPermission(this@MainActivity),
+                                            onRequestPhotoPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
+                                            onBack = { currentScreen.value = CarScreen.Dashboard },
+                                            onToggleFavorite = { track -> toggleFavorite(track) },
+                                            modifier = Modifier.padding(innerPadding)
+                                        )
+                                    }
+
+                                    CarScreen.Folders -> {
+                                        FoldersScreen(
+                                            tracks = audioTracksState,
+                                            onBack = { currentScreen.value = CarScreen.Dashboard },
+                                            onTrackSelect = { track -> playTrack(track) },
+                                            modifier = Modifier.padding(innerPadding)
+                                        )
+                                    }
+
+                                    CarScreen.Favorites -> {
+                                        FavoritesScreen(
+                                            tracks = audioTracksState + videoTracksState + photoTracksState,
+                                            favoriteVersion = favoriteVersionState.intValue,
+                                            onBack = { currentScreen.value = CarScreen.Dashboard },
+                                            onTrackSelect = { track -> playTrack(track) },
+                                            onToggleFavorite = { track -> toggleFavorite(track) },
+                                            modifier = Modifier.padding(innerPadding)
+                                        )
+                                    }
+
+                                    CarScreen.Settings -> {
+                                        SettingsScreen(
+                                            hasMediaPermission = hasPermissionState.value,
+                                            onRequestMediaPermission = { checkPermissions(autoLaunchSystemSettingsIfDenied = true) },
+                                            isTelemetryVisible = isTelemetryVisibleState,
+                                            showTelemetryOnAllDevices = showTelemetryOnAllDevicesState,
+                                            isHudEnabled = isHudEnabledState,
+                                            hudTimeoutSec = hudTimeoutSecState,
+                                            onToggleTelemetryVisibility = { show ->
+                                                isTelemetryVisibleState = show
+                                                prefs.edit().putBoolean("show_telemetry", show).apply()
+                                            },
+                                            onToggleShowTelemetryOnAllDevices = { show ->
+                                                showTelemetryOnAllDevicesState = show
+                                                prefs.edit().putBoolean("show_telemetry_all_devices", show).apply()
+                                            },
+                                            onToggleHudEnabled = { enabled ->
+                                                isHudEnabledState = enabled
+                                                prefs.edit().putBoolean("hud_enabled", enabled).apply()
+                                            },
+                                            onChangeHudTimeoutSec = { timeout ->
+                                                hudTimeoutSecState = timeout
+                                                prefs.edit().putInt("hud_timeout", timeout).apply()
+                                            },
+                                            onBack = { currentScreen.value = CarScreen.Dashboard },
+                                            modifier = Modifier.padding(innerPadding)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 🌙 AMBIENT HUD SCREENSAVER OVERLAY
+                    if (isHudActiveState) {
+                        HudScreenSaverOverlay(
+                            currentTrack = currentTrackState.value,
+                            isPlaying = isPlayingState.value,
+                            onDismiss = {
+                                isHudActiveState = false
+                                lastInteractionTimeMs = System.currentTimeMillis()
+                            }
+                        )
                     }
                 }
             }

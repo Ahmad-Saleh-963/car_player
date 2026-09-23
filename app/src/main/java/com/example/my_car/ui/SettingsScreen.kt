@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Security
@@ -63,8 +64,12 @@ fun SettingsScreen(
     onRequestMediaPermission: () -> Unit,
     isTelemetryVisible: Boolean = true,
     showTelemetryOnAllDevices: Boolean = false,
+    isHudEnabled: Boolean = true,
+    hudTimeoutSec: Int = 10,
     onToggleTelemetryVisibility: (Boolean) -> Unit = {},
     onToggleShowTelemetryOnAllDevices: (Boolean) -> Unit = {},
+    onToggleHudEnabled: (Boolean) -> Unit = {},
+    onChangeHudTimeoutSec: (Int) -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -186,9 +191,115 @@ fun SettingsScreen(
                 }
 
                 if (!isPermissionsViewOpen) {
-                    // 🌟 MAIN SETTINGS VIEW: TELEMETRY TOGGLES + PERMISSIONS CARD
+                    // 🌟 MAIN SETTINGS VIEW: HUD SCREENSAVER + TELEMETRY TOGGLES + PERMISSIONS CARD
 
-                    // Card 1: Telemetry Gauge Visibility Switch
+                    // Card 1: 🌙 Ambient HUD ScreenSaver Setting
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(20.dp))
+                            .border(
+                                width = 1.dp,
+                                color = AutomotiveCyanAccent.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(20.dp)
+                            ),
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        shadowElevation = 4.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = AutomotiveCyanAccent.copy(alpha = 0.18f),
+                                        modifier = Modifier.size(46.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Default.Nightlight,
+                                                contentDescription = null,
+                                                tint = AutomotiveCyanAccent,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Column {
+                                        Text(
+                                            text = "شاشة التوقف القيادية (HUD) 🌙",
+                                            style = MaterialTheme.typography.titleMedium.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp
+                                            ),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "تحويل الشاشة لساعة رقمية سوداء وعداد سرعة مباشر عند عدم اللمس",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Switch(
+                                    checked = isHudEnabled,
+                                    onCheckedChange = { onToggleHudEnabled(it) },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color(0xFF0F172A),
+                                        checkedTrackColor = AutomotiveCyanAccent
+                                    )
+                                )
+                            }
+
+                            if (isHudEnabled) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "مهلة عدم اللمس لتفعيل شاشة التوقف: ($hudTimeoutSec ثانية)",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        listOf(5, 10, 15, 30, 60).forEach { timeout ->
+                                            FilterChip(
+                                                selected = hudTimeoutSec == timeout,
+                                                onClick = { onChangeHudTimeoutSec(timeout) },
+                                                label = { Text("$timeout ثانية", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                                                shape = RoundedCornerShape(12.dp),
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = AutomotiveCyanAccent,
+                                                    selectedLabelColor = Color(0xFF0F172A)
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Card 2: Telemetry Gauge Visibility Switch
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -242,7 +353,7 @@ fun SettingsScreen(
                                         )
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "عرض لوحة السرعة الحية، حرارة المحرك، جهد البطارية والـ RPM بالواجهة الرئيسية",
+                                            text = "عرض لوحة السرعة، الحرارة، جهة البطارية والـ RPM بالواجهة الرئيسية",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -291,7 +402,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    // Card 2: Permissions Manager Entry Option
+                    // Card 3: Permissions Manager Entry Option
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
